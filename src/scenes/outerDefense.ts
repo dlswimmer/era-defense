@@ -112,20 +112,19 @@ export function createOuterDefenseScene(game: Game): Scene {
     const grid = el('div', { class: 'shop' });
     for (const id of TOWER_IDS) {
       const def = towerDef(id);
-      if (def.era > run.era + 1) continue; // show the next era's towers as a teaser
-      const locked = def.era > run.era;
+      // Only towers you can use in this era. Ones you can't afford yet show grayed out.
+      if (!sim.isUnlocked(run, id)) continue;
       const btn = el(
         'button',
         {
-          class: `btn${locked ? ' locked' : ''}${placing?.type === id ? ' picked' : ''}`,
+          class: `btn${placing?.type === id ? ' picked' : ''}`,
           onpointerdown: (e: Event) => onPickTower(id, e),
         },
-        el('span', { class: 'em' }, locked ? '🔒' : def.emoji),
+        el('span', { class: 'em' }, def.emoji),
         el('span', { class: 'nm' }, def.name),
-        el('span', { class: 'cost' }, locked ? '🦴 Evolve' : `💰${def.cost}`),
+        el('span', { class: 'cost' }, `💰${def.cost}`),
       );
-      if (locked) btn.disabled = true;
-      else costButtons.push({ btn, cost: () => def.cost });
+      costButtons.push({ btn, cost: () => def.cost });
       grid.append(btn);
     }
     return grid;
