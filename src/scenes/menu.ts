@@ -20,7 +20,7 @@ export function createMenuScene(game: Game): Scene {
         { class: 'card' },
         el('div', { class: 'emoji-row' }, '🪨🏹🎯💣🚀⚡'),
         el('h1', {}, 'Era Defense'),
-        el('p', {}, 'Build towers. Evolve from rocks to lasers. Hold the wall as long as you can!'),
+        el('p', {}, 'Build towers. Hold the wall. Earn Relics to evolve from rocks to lasers!'),
         best.wave
           ? el(
               'p',
@@ -32,12 +32,17 @@ export function createMenuScene(game: Game): Scene {
           'div',
           { class: 'stack' },
           el('button', { class: 'btn go big', onclick: () => game.go('outer') }, '▶ Play'),
+          el(
+            'button',
+            { class: 'btn primary', onclick: () => game.go('upgrades') },
+            `🦴 Upgrades (${game.meta.relics})`,
+          ),
           el('button', { class: 'btn', onclick: () => openIdeaBox(game, show) }, '💡 Idea Box'),
         ),
         el(
           'p',
           { style: 'font-size:13px;margin-top:16px' },
-          'Tap a grass square to build. Stop enemies to earn 💰 gold and fill your ⚔️ War Chest. Evolve to unlock new towers!',
+          'Tap a grass square to build. Stop enemies to earn 💰 gold. When the wall falls you get 🦴 Relics: spend them to Evolve and unlock new towers!',
         ),
       ),
     );

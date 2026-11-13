@@ -1,9 +1,13 @@
 // A simple bot that plays Phase 1, used by tests and `npm run balance` to check pacing.
 import { towerDef, TOWER_IDS, type TowerId } from '../data/towers';
+import { relicsEarned, type RunOptions } from '../data/metaUpgrades';
 import * as sim from '../run';
 
 export interface BotResult {
   wave: number;
+  held: number;
+  time: number;
+  relics: number;
   era: number;
   chest: number;
   kills: number;
@@ -36,17 +40,9 @@ function bestSpot(run: sim.Run, range: number): { col: number; row: number } | n
   return best;
 }
 
-/** Spend gold the way a decent player might: keep up with the eras, then build, then upgrade. */
+/** Spend gold the way a decent player might: build the best tower it can, then upgrade. */
 export function spend(run: sim.Run) {
   for (let guard = 0; guard < 100; guard++) {
-    const evolveCost = sim.evolveCost(run);
-    const behind = sim.nextWaveTier(run) > run.era;
-    if (evolveCost !== null && run.gold >= evolveCost && (behind || run.gold > evolveCost + 150)) {
-      sim.evolve(run);
-      continue;
-    }
-    if (behind && evolveCost !== null && run.towers.length >= 3) return; // save up to evolve
-
     const options = TOWER_IDS.filter(
       (id) => sim.isUnlocked(run, id) && run.gold >= towerDef(id).cost,
     );
@@ -70,21 +66,33 @@ export function spend(run: sim.Run) {
   }
 }
 
-export function playRun(seed: number, maxWaves = 200): BotResult {
-  const run = sim.createRun(seed);
-  while (!run.breached && run.wave < maxWaves) {
-    spend(run);
-    sim.startWave(run);
-    while (run.waveActive && !run.breached) {
-      sim.step(run, 0.05);
-      run.events.length = 0;
+/** Plays one run until the wall falls (or a time limit, in seconds of game time). */
+export function playRun(
+  seed: number,
+  options: Partial<RunOptions> = {},
+  maxTime = 3600,
+): BotResult {
+  const run = sim.createRun(seed, options);
+  spend(run);
+  sim.startWave(run);
+  let sinceSpend = 0;
+  while (!run.breached && run.time < maxTime) {
+    sim.step(run, 0.05);
+    run.events.length = 0;
+    sinceSpend += 0.05;
+    if (sinceSpend >= 1) {
+      sinceSpend = 0;
+      spend(run);
     }
   }
   return {
     wave: run.wave,
+    held: sim.wavesHeld(run),
     era: run.era,
     chest: run.chest,
     kills: run.kills,
     towers: run.towers.length,
+    time: run.time,
+    relics: relicsEarned(run),
   };
 }

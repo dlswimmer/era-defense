@@ -5,6 +5,7 @@ import { saveMeta } from '../save';
 import { ERAS } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
 import { GAME } from '../sim/data/game';
+import { relicsEarned, runOptions } from '../sim/data/metaUpgrades';
 import { TOWER_IDS, towerDef, sellValue, type TowerId } from '../sim/data/towers';
 import type { Point } from '../sim/path';
 import * as sim from '../sim/run';
@@ -88,7 +89,6 @@ export function createOuterDefenseScene(game: Game): Scene {
     wave: el('button', { class: 'btn go wave', onclick: () => onWaveButton() }),
     speed: el('button', { class: 'btn', onclick: () => cycleSpeed(), 'aria-label': 'Speed' }),
     pause: el('button', { class: 'btn', onclick: () => (paused = !paused), 'aria-label': 'Pause' }),
-    evolve: el('button', { class: 'btn evolve', onclick: () => onEvolve() }),
     idea: el(
       'button',
       { class: 'btn idea', onclick: () => onIdea(), 'aria-label': 'Idea Box' },
@@ -101,7 +101,7 @@ export function createOuterDefenseScene(game: Game): Scene {
 
   const buildPanel = () => {
     $('panel').replaceChildren(
-      el('div', { class: 'controls' }, ctl.wave, ctl.speed, ctl.pause, ctl.evolve),
+      el('div', { class: 'controls' }, ctl.wave, ctl.speed, ctl.pause),
       context,
     );
   };
@@ -128,7 +128,7 @@ export function createOuterDefenseScene(game: Game): Scene {
         { class: `btn${locked ? ' locked' : ''}`, onclick: () => onBuild(id) },
         el('span', { class: 'em' }, locked ? '🔒' : def.emoji),
         el('span', { class: 'nm' }, def.name),
-        el('span', { class: 'cost' }, locked ? `${ERAS[def.era]!.base} Evolve` : `💰${def.cost}`),
+        el('span', { class: 'cost' }, locked ? '🦴 Evolve' : `💰${def.cost}`),
       );
       if (locked) btn.disabled = true;
       else costButtons.push({ btn, cost: () => def.cost });
@@ -184,25 +184,18 @@ export function createOuterDefenseScene(game: Game): Scene {
   };
 
   const updatePanel = () => {
-    if (run.waveActive) {
+    if (!run.started) {
+      setText(ctl.wave, '▶ Start');
+      setDisabled(ctl.wave, false);
+    } else if (sim.isSpawning(run) || run.breached) {
       setText(ctl.wave, `🌊 Wave ${run.wave}`);
       setDisabled(ctl.wave, true);
     } else {
-      setText(ctl.wave, `▶ Wave ${run.wave + 1}`);
-      setDisabled(ctl.wave, run.breached);
+      setText(ctl.wave, `⏩ Next +${sim.earlyCallBonus(run)}💰`);
+      setDisabled(ctl.wave, false);
     }
     setText(ctl.speed, `${speed}×`);
     setText(ctl.pause, paused ? '▶️' : '⏸️');
-    const cost = sim.evolveCost(run);
-    if (cost === null) {
-      ctl.evolve.hidden = true;
-    } else {
-      ctl.evolve.hidden = false;
-      setText(ctl.evolve, `⬆️${ERAS[run.era + 1]!.base} ${cost}`);
-      setDisabled(ctl.evolve, run.gold < cost || run.breached);
-      // Wiggle when the next wave brings a tougher era of enemies and you can afford to evolve.
-      ctl.evolve.classList.toggle('nudge', run.gold >= cost && sim.nextWaveTier(run) > run.era);
-    }
     for (const { btn, cost } of costButtons) {
       const c = cost();
       setDisabled(btn, c === null || run.gold < c || run.breached);
@@ -211,21 +204,10 @@ export function createOuterDefenseScene(game: Game): Scene {
 
   // ---------- Actions ----------
   const onWaveButton = () => {
-    if (sim.startWave(run)) {
-      paused = false;
-      const boss = run.queue.some((s) => s.boss);
-      showBanner(boss ? `👑 Boss wave ${run.wave}!` : `Wave ${run.wave}`);
-    }
+    if (sim.startWave(run)) paused = false;
   };
   const cycleSpeed = () => {
     speed = speed >= 3 ? 1 : speed + 1;
-  };
-  const onEvolve = () => {
-    if (!sim.evolve(run)) return;
-    const era = ERAS[run.era]!;
-    showBanner(`${era.base} ${era.name}!`);
-    addPopup(run.map.base.col + 0.5, run.map.base.row - 0.3, 'Wall repaired!', '#5fd068', 0.4);
-    renderContext();
   };
   const onIdea = () => {
     const wasPaused = paused;
@@ -285,8 +267,10 @@ export function createOuterDefenseScene(game: Game): Scene {
         case 'splash':
           rings.push({ x: ev.x, y: ev.y, r: ev.radius, t: 0 });
           break;
-        case 'waveCleared':
-          showBanner(`Wave cleared! +${ev.bonus}💰`);
+        case 'waveStart':
+          showBanner(
+            `${ev.boss ? `👑 Boss wave ${ev.wave}!` : `Wave ${ev.wave}`}${ev.bonus ? `  +${ev.bonus}💰` : ''}`,
+          );
           break;
         case 'breach':
           breachTimer = 0;
@@ -300,17 +284,22 @@ export function createOuterDefenseScene(game: Game): Scene {
   };
 
   const finishRun = () => {
-    const best = game.meta.best;
-    const newBest = run.wave > best.wave;
-    if (newBest) game.meta.best = { wave: run.wave, era: run.era, chest: run.chest };
-    game.meta.runs++;
-    saveMeta(game.meta);
+    const { meta } = game;
+    const newBest = run.wave > meta.best.wave;
+    if (newBest) meta.best = { wave: run.wave, era: run.era, chest: run.chest };
+    const relics = relicsEarned(run);
+    meta.relics += relics;
+    meta.runs++;
+    saveMeta(meta);
     const summary: RunSummary = {
       wave: run.wave,
       era: run.era,
       chest: run.chest,
       kills: run.kills,
       bosses: run.bosses,
+      held: sim.wavesHeld(run),
+      time: run.time,
+      relics,
       newBest,
     };
     game.go('breach', summary);
@@ -323,7 +312,7 @@ export function createOuterDefenseScene(game: Game): Scene {
   // ---------- Scene ----------
   return {
     enter() {
-      run = sim.createRun();
+      run = sim.createRun(Date.now(), runOptions(game.meta.upgrades));
       // Add ?dev to the URL for lots of gold (handy for testing new towers).
       if (new URLSearchParams(location.search).has('dev')) run.gold = 99_999;
       selected = null;
@@ -334,7 +323,7 @@ export function createOuterDefenseScene(game: Game): Scene {
       rings = [];
       shake = 0;
       breachTimer = -1;
-      banner = { text: 'Build towers, then tap ▶ Wave', t: -1.5 };
+      banner = { text: 'Build towers, then tap ▶ Start', t: -1.5 };
       buildHud();
       buildPanel();
       $('hud').hidden = false;

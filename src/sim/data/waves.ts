@@ -5,14 +5,16 @@ import type { Rng } from '../rng';
 export const WAVES = {
   tierEvery: 5, // enemy tier goes up every N waves
   bossEvery: 5, // boss on every Nth wave
-  baseCount: 6, // enemies in wave 1 (roughly)
-  countPerWave: 1.2, // extra enemies per wave
-  hpPerWave: 0.07, // +7% enemy HP per wave
+  breather: 5, // seconds between the last spawn of a wave and the next wave
+  baseCount: 5, // enemies in wave 1 (roughly)
+  countPerWave: 1, // extra enemies per wave
+  hpInTier: 0.15, // +15% enemy HP for each wave within a tier (tiers end tough)
+  hpPerWave: 0.03, // +3% enemy HP per wave overall
   endlessAfter: 30, // after this wave, HP grows faster...
   endlessGrowth: 1.1, // ...by this much per wave
-  firstGap: 1.0, // seconds between spawns in wave 1
+  firstGap: 0.9, // seconds between spawns in wave 1
   minGap: 0.35,
-  clearBonus: (n: number) => 10 + n * 2, // gold for clearing a wave
+  waveBonus: (n: number) => 5 + n * 2, // gold paid when wave n starts (after the first)
 };
 
 const MAX_TIER = Math.max(...ENEMY_IDS.map((id) => enemyDef(id).tier));
@@ -22,7 +24,8 @@ export function tierFor(wave: number): number {
 }
 
 export function hpScale(wave: number): number {
-  let s = 1 + WAVES.hpPerWave * (wave - 1);
+  const inTier = (wave - 1) % WAVES.tierEvery;
+  let s = (1 + WAVES.hpInTier * inTier) * (1 + WAVES.hpPerWave * (wave - 1));
   if (wave > WAVES.endlessAfter) s *= Math.pow(WAVES.endlessGrowth, wave - WAVES.endlessAfter);
   return s;
 }

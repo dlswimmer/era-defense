@@ -1,8 +1,8 @@
-// Shown after the outer wall falls. Phase 2 (Last Stand) will start from here in M2.
-// For now it shows the run's results and lets the kids vote on what Phase 2 should look like.
+// Shown after the outer wall falls. Phase 2 (the side-view Last Stand) will start from here in
+// M2. For now it shows the run's results and the Relics earned.
 import type { Game, RunSummary, Scene } from '../game';
-import { saveMeta } from '../save';
 import { ERAS } from '../sim/data/eras';
+import { META_UPGRADES, nextCost } from '../sim/data/metaUpgrades';
 import { el, hideOverlay, showOverlay } from '../ui/dom';
 
 export function createBreachScene(game: Game): Scene {
@@ -11,14 +11,18 @@ export function createBreachScene(game: Game): Scene {
   const stat = (v: string, l: string) =>
     el('div', { class: 'stat' }, el('div', { class: 'v' }, v), el('div', { class: 'l' }, l));
 
+  /** True when there is an upgrade the player can afford right now. */
+  const canBuySomething = () =>
+    META_UPGRADES.some((up) => {
+      const cost = nextCost(up, game.meta.upgrades[up.id] ?? 0);
+      return cost !== null && cost <= game.meta.relics;
+    });
+
   const show = () => {
     const era = ERAS[summary.era]!;
-    const { votes } = game.meta;
-    const vote = (key: 'topdown' | 'side') => () => {
-      votes[key]++;
-      saveMeta(game.meta);
-      show();
-    };
+    const secs = Math.round(summary.time);
+    const time = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    const shop = canBuySomething();
     showOverlay(
       el(
         'div',
@@ -27,42 +31,37 @@ export function createBreachScene(game: Game): Scene {
         summary.newBest
           ? el('p', { style: 'color:var(--gold);font-weight:800' }, '🏆 New best!')
           : '',
+        el('div', { class: 'relics big-relics' }, `+${summary.relics} 🦴 Relics`),
         el(
           'div',
           { class: 'stats' },
-          stat(`🌊 ${summary.wave}`, 'Waves held'),
-          stat(`${era.base} ${era.name}`, 'Era reached'),
+          stat(`🌊 ${summary.wave}`, 'Wave reached'),
+          stat(`${era.base} ${era.name}`, `held for ${time}`),
           stat(`👊 ${summary.kills}`, 'Enemies stopped'),
           stat(`⚔️ ${summary.chest}`, 'War Chest'),
         ),
         el(
           'p',
-          {},
-          'Next up: the Last Stand! You will spend your War Chest to defend the base. Which should it be?',
+          { class: 'teaser' },
+          '🏰 Coming soon: the Last Stand! A side view of your base where you spend the War Chest to hold out as long as you can.',
         ),
         el(
           'div',
-          { class: 'vote' },
+          { class: 'stack' },
           el(
             'button',
-            { class: 'btn', onclick: vote('topdown') },
-            el('span', { class: 'em' }, '🗺️'),
-            'Top-down: build walls & traps',
-            el('span', { class: 'n' }, `${votes.topdown} votes`),
+            {
+              class: `btn ${shop ? 'go big nudge' : 'primary'}`,
+              onclick: () => game.go('upgrades'),
+            },
+            `🦴 Upgrades (${game.meta.relics})`,
           ),
           el(
-            'button',
-            { class: 'btn', onclick: vote('side') },
-            el('span', { class: 'em' }, '🏹'),
-            'Side view: tap to shoot',
-            el('span', { class: 'n' }, `${votes.side} votes`),
+            'div',
+            { class: 'row' },
+            el('button', { class: 'btn', onclick: () => game.go('menu') }, '🏠 Menu'),
+            el('button', { class: 'btn go', onclick: () => game.go('outer') }, '🔁 Play again'),
           ),
-        ),
-        el(
-          'div',
-          { class: 'row', style: 'margin-top:16px' },
-          el('button', { class: 'btn', onclick: () => game.go('menu') }, '🏠 Menu'),
-          el('button', { class: 'btn go', onclick: () => game.go('outer') }, '🔁 Play again'),
         ),
       ),
     );

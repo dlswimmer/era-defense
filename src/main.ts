@@ -5,6 +5,7 @@ import { loadMeta } from './save';
 import { createBreachScene } from './scenes/breach';
 import { createMenuScene } from './scenes/menu';
 import { createOuterDefenseScene } from './scenes/outerDefense';
+import { createUpgradesScene } from './scenes/upgrades';
 import { $ } from './ui/dom';
 
 const canvas = $<HTMLCanvasElement>('game');
@@ -25,6 +26,7 @@ const game: Game = {
 scenes.menu = createMenuScene(game);
 scenes.outer = createOuterDefenseScene(game);
 scenes.breach = createBreachScene(game);
+scenes.upgrades = createUpgradesScene(game);
 
 canvas.addEventListener('pointerdown', (e) => {
   const rect = canvas.getBoundingClientRect();

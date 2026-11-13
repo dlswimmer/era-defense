@@ -8,10 +8,17 @@ describe('migrate', () => {
   });
 
   it('keeps known fields and fills in missing ones', () => {
-    const m = migrate({ best: { wave: 9 }, ideas: [{ name: 'A', text: 'lava tower', date: 'x' }] });
+    const m = migrate({
+      version: 1,
+      votes: { topdown: 1, side: 2 },
+      best: { wave: 9 },
+      ideas: [{ name: 'A', text: 'lava tower', date: 'x' }],
+    });
+    expect(m).not.toHaveProperty('votes');
     expect(m.best).toEqual({ wave: 9, era: 0, chest: 0 });
     expect(m.ideas).toHaveLength(1);
-    expect(m.votes).toEqual({ topdown: 0, side: 0 });
+    expect(m.relics).toBe(0);
+    expect(m.upgrades).toEqual({});
     expect(m.version).toBe(SAVE_VERSION);
   });
 });

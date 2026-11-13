@@ -417,3 +417,65 @@ body {
     font-size: 22px;
   }
 }
+
+/* ---------- Upgrades ---------- */
+.relics {
+  display: inline-block;
+  background: var(--panel-2);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 800;
+  font-size: 18px;
+}
+.flash {
+  color: var(--gold) !important;
+  font-weight: 800;
+}
+.upgrades {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  text-align: left;
+}
+.upgrade {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: var(--panel-2);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+.upgrade.era {
+  background: #4b3a73;
+}
+.upgrade .em {
+  font-size: 30px;
+  width: 38px;
+  text-align: center;
+}
+.upgrade .txt {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.upgrade .txt b {
+  font-size: 15px;
+}
+.upgrade .extra {
+  color: var(--gold);
+}
+.upgrade .btn {
+  min-width: 72px;
+}
+.big-relics {
+  font-size: 24px;
+  color: var(--gold);
+  margin: 4px 0 2px;
+}
+.teaser {
+  font-size: 13px;
+  background: #2c2440;
+  border-radius: 10px;
+  padding: 8px 10px;
+}

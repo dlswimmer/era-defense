@@ -1,3 +1,5 @@
+import type { UpgradeLevels } from './sim/data/metaUpgrades';
+
 // Saved progress on this device (localStorage). Every read and write is wrapped in try/catch
 // because storage can be missing or blocked (private mode, full disk, old browsers).
 // Bump SAVE_VERSION and add a migration in `migrate` when the shape changes.
@@ -12,21 +14,23 @@ export interface Meta {
   version: number;
   best: { wave: number; era: number; chest: number };
   runs: number;
+  relics: number; // Relics 🦴 waiting to be spent
+  upgrades: UpgradeLevels; // level of each Relic upgrade
   ideas: Idea[];
-  votes: { topdown: number; side: number };
   lastName: string;
 }
 
 const KEY = 'eraDefense.save';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export function defaultMeta(): Meta {
   return {
     version: SAVE_VERSION,
     best: { wave: 0, era: 0, chest: 0 },
     runs: 0,
+    relics: 0,
+    upgrades: {},
     ideas: [],
-    votes: { topdown: 0, side: 0 },
     lastName: '',
   };
 }
@@ -34,12 +38,15 @@ export function defaultMeta(): Meta {
 export function migrate(raw: unknown): Meta {
   const base = defaultMeta();
   if (!raw || typeof raw !== 'object') return base;
-  const r = raw as Partial<Meta>;
+  const r = raw as Partial<Meta> & { votes?: unknown };
+  // v1 had a Phase 2 style vote; it was decided (side view), so drop it.
+  delete r.votes;
   return {
     ...base,
     ...r,
     best: { ...base.best, ...(r.best ?? {}) },
-    votes: { ...base.votes, ...(r.votes ?? {}) },
+    upgrades: { ...(r.upgrades ?? {}) },
+    relics: typeof r.relics === 'number' ? r.relics : 0,
     ideas: Array.isArray(r.ideas) ? r.ideas : [],
     version: SAVE_VERSION,
   };

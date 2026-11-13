@@ -4,8 +4,9 @@ import { ERAS } from './data/eras';
 import { enemyDef, type EnemyId } from './data/enemies';
 import { GAME } from './data/game';
 import { MAPS } from './data/maps';
+import type { RunOptions } from './data/metaUpgrades';
 import { towerDef, upgradeCost, sellValue, type TowerId } from './data/towers';
-import { buildWave, hpScale, tierFor, WAVES, type Spawn } from './data/waves';
+import { buildWave, hpScale, WAVES, type Spawn } from './data/waves';
 import { cellKey, posAt, prepareMap, type Point, type PreparedMap } from './path';
 import { createRng, type Rng } from './rng';
 
@@ -50,7 +51,7 @@ export type SimEvent =
   | { type: 'leak'; x: number; y: number; dmg: number }
   | { type: 'beam'; tower: TowerId; points: Point[] }
   | { type: 'splash'; x: number; y: number; radius: number }
-  | { type: 'waveCleared'; wave: number; bonus: number }
+  | { type: 'waveStart'; wave: number; boss: boolean; bonus: number }
   | { type: 'breach' };
 
 export interface Run {
@@ -60,7 +61,9 @@ export interface Run {
   gold: number;
   chest: number;
   wave: number;
-  waveActive: boolean;
+  firstWave: number; // the wave this run started after (later eras skip the easy waves)
+  started: boolean; // has the first wave been called?
+  nextWaveIn: number; // countdown (seconds) to the next wave, once the current one has spawned
   queue: Spawn[];
   gap: number;
   spawnTimer: number;
@@ -77,24 +80,36 @@ export interface Run {
   events: SimEvent[];
 }
 
-export function createRun(seed = Date.now(), mapId = 'meadow'): Run {
-  const era = ERAS[0]!;
+const DEFAULT_OPTIONS: RunOptions = { era: 0, bonusGold: 0, bonusWall: 0 };
+
+export function createRun(
+  seed = Date.now(),
+  options: Partial<RunOptions> = {},
+  mapId = 'meadow',
+): Run {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const era = ERAS[opts.era]!;
+  const wall = era.wallHp + opts.bonusWall;
+  // Later eras skip ahead so the first waves aren't a snooze: start one enemy tier below your era.
+  const firstWave = Math.max(0, opts.era - 1) * WAVES.tierEvery;
   return {
     map: prepareMap(MAPS[mapId]!),
     rng: createRng(seed),
-    era: 0,
-    gold: GAME.startGold,
+    era: opts.era,
+    gold: era.startGold + opts.bonusGold,
     chest: 0,
-    wave: 0,
-    waveActive: false,
+    wave: firstWave,
+    firstWave,
+    started: false,
+    nextWaveIn: 0,
     queue: [],
     gap: 1,
     spawnTimer: 0,
     enemies: [],
     towers: [],
     shots: [],
-    wallHp: era.wallHp,
-    wallMax: era.wallHp,
+    wallHp: wall,
+    wallMax: wall,
     kills: 0,
     bosses: 0,
     time: 0,
@@ -159,32 +174,40 @@ export function sell(run: Run, tower: Tower): number {
   return value;
 }
 
-export function evolveCost(run: Run): number | null {
-  const next = ERAS[run.era + 1];
-  return next ? next.evolveCost : null;
-}
+/** True while the current wave is still sending enemies. */
+export const isSpawning = (run: Run) => run.queue.length > 0;
 
-/** Evolve to the next era: unlocks towers, fully repairs the wall and raises its max HP. */
-export function evolve(run: Run): boolean {
-  const cost = evolveCost(run);
-  if (cost === null || run.gold < cost || run.breached) return false;
-  run.gold -= cost;
-  run.era++;
-  run.wallMax = ERAS[run.era]!.wallHp;
-  run.wallHp = run.wallMax;
-  return true;
-}
+/** Gold you get for calling the next wave now instead of waiting for the countdown. */
+export const earlyCallBonus = (run: Run) =>
+  run.started ? Math.ceil(run.nextWaveIn) * GAME.earlyCallGold : 0;
 
+/**
+ * Starts the next wave. The player calls the first wave; after that waves come on their own
+ * a few seconds after the previous one has finished spawning, or early when the player taps.
+ */
 export function startWave(run: Run): boolean {
-  if (run.waveActive || run.breached) return false;
+  if (run.breached || isSpawning(run)) return false;
+  const bonus = run.started ? WAVES.waveBonus(run.wave) + earlyCallBonus(run) : 0;
+  run.gold += bonus;
+  run.started = true;
   run.wave++;
   const wave = buildWave(run.wave, run.rng);
   run.queue = wave.spawns;
   run.gap = wave.gap;
   run.spawnTimer = 0;
-  run.waveActive = true;
+  run.nextWaveIn = WAVES.breather;
+  run.events.push({
+    type: 'waveStart',
+    wave: run.wave,
+    boss: wave.spawns.some((sp) => sp.boss),
+    bonus,
+  });
   return true;
 }
+
+/** Waves the player held off this run. */
+export const wavesHeld = (run: Run) =>
+  Math.max(0, run.wave - run.firstWave - (run.breached ? 1 : 0));
 
 // ---------- Simulation ----------
 
@@ -196,7 +219,10 @@ export function step(run: Run, dt: number): void {
   if (run.breached) return;
   fireTowers(run, dt);
   moveShots(run, dt);
-  checkWaveEnd(run);
+  if (run.started && !isSpawning(run)) {
+    run.nextWaveIn -= dt;
+    if (run.nextWaveIn <= 0) startWave(run);
+  }
 }
 
 function spawnEnemies(run: Run, dt: number) {
@@ -215,7 +241,7 @@ function spawnEnemies(run: Run, dt: number) {
     tier: def.tier,
     hp,
     maxHp: hp,
-    speed: def.speed * (spawn.boss ? 0.8 : 1),
+    speed: def.speed * GAME.enemySpeed * (spawn.boss ? 0.8 : 1),
     d: 0,
     x: start.x,
     y: start.y,
@@ -242,7 +268,7 @@ function moveEnemies(run: Run, dt: number) {
   run.enemies = run.enemies.filter((e) => e.hp > 0);
   if (run.wallHp <= 0) {
     run.breached = true;
-    run.waveActive = false;
+    run.queue = [];
     run.events.push({ type: 'breach' });
   }
 }
@@ -365,14 +391,3 @@ function damage(run: Run, e: Enemy, dmg: number) {
   if (e.boss) run.bosses++;
   run.events.push({ type: 'kill', x: e.x, y: e.y, gold, chest, boss: e.boss });
 }
-
-function checkWaveEnd(run: Run) {
-  if (!run.waveActive || run.queue.length || run.enemies.length) return;
-  run.waveActive = false;
-  const bonus = WAVES.clearBonus(run.wave);
-  run.gold += bonus;
-  run.events.push({ type: 'waveCleared', wave: run.wave, bonus });
-}
-
-/** The enemy tier the next wave will bring, so the UI can warn "Evolve soon!". */
-export const nextWaveTier = (run: Run) => tierFor(run.wave + 1);

@@ -9,7 +9,7 @@ export interface Scene {
   onResize?(): void;
 }
 
-export type SceneName = 'menu' | 'outer' | 'breach';
+export type SceneName = 'menu' | 'outer' | 'breach' | 'upgrades';
 
 export interface Game {
   canvas: HTMLCanvasElement;
@@ -25,5 +25,8 @@ export interface RunSummary {
   chest: number;
   kills: number;
   bosses: number;
+  held: number;
+  time: number;
+  relics: number;
   newBest: boolean;
 }

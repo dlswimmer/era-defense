@@ -23,20 +23,20 @@ export const ENEMIES = {
   chariot: { name: 'Chariot', emoji: '🐎', tier: 1, hp: 80, speed: 1.5, gold: 7, heavy: true },
   knight: { name: 'Knight', emoji: '🏇', tier: 2, hp: 120, speed: 1.1, gold: 8 },
   ram: { name: 'Battering Ram', emoji: '🪵', tier: 2, hp: 260, speed: 0.55, gold: 12, heavy: true },
-  musketeer: { name: 'Musketeer', emoji: '💂', tier: 3, hp: 230, speed: 1.1, gold: 10 },
-  ship: { name: 'Pirate Ship', emoji: '⛵', tier: 3, hp: 520, speed: 0.6, gold: 18, heavy: true },
-  soldier: { name: 'Soldier', emoji: '🪖', tier: 4, hp: 420, speed: 1.2, gold: 14 },
+  musketeer: { name: 'Musketeer', emoji: '💂', tier: 3, hp: 170, speed: 1.1, gold: 10 },
+  ship: { name: 'Pirate Ship', emoji: '⛵', tier: 3, hp: 380, speed: 0.6, gold: 18, heavy: true },
+  soldier: { name: 'Soldier', emoji: '🪖', tier: 4, hp: 260, speed: 1.2, gold: 14 },
   helicopter: {
     name: 'Helicopter',
     emoji: '🚁',
     tier: 4,
-    hp: 640,
+    hp: 420,
     speed: 1.5,
     gold: 18,
     heavy: true,
   },
-  robot: { name: 'Robot', emoji: '🤖', tier: 5, hp: 950, speed: 1.0, gold: 22 },
-  ufo: { name: 'UFO', emoji: '🛸', tier: 5, hp: 1400, speed: 1.4, gold: 30, heavy: true },
+  robot: { name: 'Robot', emoji: '🤖', tier: 5, hp: 520, speed: 1.0, gold: 22 },
+  ufo: { name: 'UFO', emoji: '🛸', tier: 5, hp: 800, speed: 1.4, gold: 30, heavy: true },
 } satisfies Record<string, EnemyDef>;
 
 export type EnemyId = keyof typeof ENEMIES;

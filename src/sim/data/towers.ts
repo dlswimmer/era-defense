@@ -46,9 +46,9 @@ export const TOWERS = {
     kind: 'shot',
     shot: { color: '#6b4423', size: 0.1, speed: 11 },
     levels: [
-      { dmg: 12, range: 3.0, rate: 1.6 },
-      { dmg: 20, range: 3.2, rate: 1.8 },
-      { dmg: 32, range: 3.5, rate: 2.0 },
+      { dmg: 8, range: 2.8, rate: 1.6 },
+      { dmg: 13, range: 3.0, rate: 1.8 },
+      { dmg: 20, range: 3.2, rate: 2.0 },
     ],
   },
   catapult: {
@@ -114,9 +114,9 @@ export const TOWERS = {
     kind: 'beam',
     beam: { color: '#ff4df0', width: 3 },
     levels: [
-      { dmg: 40, range: 3.5, rate: 6 },
-      { dmg: 65, range: 3.8, rate: 6.5 },
-      { dmg: 100, range: 4.1, rate: 7 },
+      { dmg: 60, range: 3.5, rate: 6 },
+      { dmg: 95, range: 3.8, rate: 6.5 },
+      { dmg: 140, range: 4.1, rate: 7 },
     ],
   },
   tesla: {
@@ -128,9 +128,9 @@ export const TOWERS = {
     chain: 4,
     beam: { color: '#7df9ff', width: 2 },
     levels: [
-      { dmg: 90, range: 2.8, rate: 1.2 },
-      { dmg: 140, range: 3.0, rate: 1.3 },
-      { dmg: 210, range: 3.2, rate: 1.4 },
+      { dmg: 130, range: 2.8, rate: 1.2 },
+      { dmg: 200, range: 3.0, rate: 1.3 },
+      { dmg: 300, range: 3.2, rate: 1.4 },
     ],
   },
 } satisfies Record<string, TowerDef>;
