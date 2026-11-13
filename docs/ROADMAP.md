@@ -52,14 +52,16 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   A map is one entry in `src/sim/data/maps.ts`.
 - **Phase 2 is a side view**: your wall on the left, enemies come from the right, and you
   build units on the wall using the War Chest.
-- **Graphics pass** wanted later.
+- **Look (David, Nov 13):** cartoon sprites drawn in code with thick outlines. Towers and
+  defenders are people who wind up and throw. Enemies are monsters that get more armored, then
+  robotic, era by era. Stone Age is done first; other eras keep emoji until they get art.
 
 ## Next
 
 - **M1 balance pass with the kids.** Knobs: `src/sim/data/game.ts`, `waves.ts`, `towers.ts`,
   `enemies.ts`, `eras.ts`. Check with `npm run balance` after changes.
-- **Graphics pass** (David wants better art than plain emoji). The trail and grass got a first
-  pass; towers and enemies are still emoji.
+- **Graphics pass, Stone Age done** (Rock Thrower, Spear Thrower, Grumbler, Woolly Brute, hut,
+  trees). Get the kids' reactions, then do the next era's people and monsters in `src/art/`.
 - **Last Stand next steps:** pick the 4 defenders per era with the kids (data in
   `src/sim/data/units.ts`), a 2.5D look in the graphics pass, flying enemies, wall repair.
 - **M3 rest:** more upgrades (tower mastery, heroes, base blueprints), Relics from Phase 2 time.

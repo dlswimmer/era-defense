@@ -2,6 +2,16 @@
 // from far to the right; drag the field (or scroll) to see them coming. Buy defenders with the
 // War Chest and they take a place on the wall; buy team boosts to make them all stronger.
 // Draws src/sim/stand.ts.
+import {
+  UNIT_LOOKS,
+  drawBaseArt,
+  drawDecor,
+  drawEnemyArt,
+  drawThrown,
+  enemyArtHeight,
+  hasEnemyArt,
+} from '../art/cast';
+import { Puffs, RELEASE, drawPerson, drawShadow } from '../art/sprites';
 import type { Game, RunSummary, Scene } from '../game';
 import { emoji, fitCanvas, hpBar, shade, text } from '../render';
 import { saveMeta } from '../save';
@@ -27,6 +37,11 @@ interface Popup {
 }
 
 const FALL_TIME = 2.6;
+/** Drawn defenders and monsters, in tiles tall. */
+const PERSON_SIZE = 1.05;
+const ENEMY_SIZE = 0.95;
+/** How long a thrower's follow-through lasts, in seconds. */
+const FOLLOW_THROUGH = 0.25;
 const VIEW_W = STAND.view.width;
 const VIEW_H = STAND.view.height;
 const MAX_CAM = STAND.fieldWidth - VIEW_W;
@@ -51,6 +66,9 @@ export function createLastStandScene(game: Game): Scene {
   const hitFlash = new Map<number, number>();
   const lastCooldown = new Map<number, number>();
   const firePulse = new Map<number, number>();
+  const lastFire = new Map<number, number>(); // defender id -> clock when it last threw
+  const shotStart = new WeakMap<st.StandShot, st.Pos3>();
+  const puffs = new Puffs();
 
   // Screen position (CSS pixels) of a point on the field.
   const sx = (x: number, z = 0) => (x - camX + z * STAND.skew) * tile;
@@ -198,10 +216,12 @@ export function createLastStandScene(game: Game): Scene {
     for (const ev of stand.events) {
       switch (ev.type) {
         case 'kill':
+          puffs.poof(sx(ev.x, ev.z), sy(ev.y, ev.z), tile * (ev.boss ? 1 : 0.55));
           addPopup(ev.x, ev.y - 0.3, ev.z, `+${ev.chest}⚔️`, '#ffd34d', ev.boss ? 0.5 : 0.3);
           if (ev.boss) shake = Math.max(shake, 0.3);
           break;
         case 'wallHit':
+          puffs.hit(sx(STAND.wall.front, ev.z), sy(STAND.groundY - 0.8, ev.z), tile * 0.5);
           addPopup(STAND.wall.front + 0.3, STAND.groundY - 1.2, ev.z, `-${ev.dmg}`, '#ff5d5d');
           if (camX < STAND.wall.front + 1) shake = Math.max(shake, ev.dmg >= 5 ? 0.35 : 0.12);
           break;
@@ -238,7 +258,10 @@ export function createLastStandScene(game: Game): Scene {
     }
     for (const id of lastHp.keys()) if (!alive.has(id)) lastHp.delete(id);
     for (const u of stand.defenders) {
-      if (u.cooldown > (lastCooldown.get(u.id) ?? 0) + 0.01) firePulse.set(u.id, 0.16);
+      if (u.cooldown > (lastCooldown.get(u.id) ?? 0) + 0.01) {
+        firePulse.set(u.id, 0.16);
+        lastFire.set(u.id, clock);
+      }
       lastCooldown.set(u.id, u.cooldown);
     }
   };
@@ -345,6 +368,7 @@ export function createLastStandScene(game: Game): Scene {
       const y = front ? g + 0.9 + rng.next() * 1.4 : g;
       const z = front ? 0 : STAND.depth + 0.3 + rng.next() * 0.5;
       if (sx(x, z) < -tile || sx(x, z) > w + tile) continue;
+      if (drawDecor(ctx, era.id, i, sx(x, z), sy(y, z) + tile * 0.1, tile)) continue;
       emoji(ctx, era.decor[i % era.decor.length]!, sx(x, z), sy(y, z) - tile * 0.25, tile * 0.65);
     }
   };
@@ -419,7 +443,8 @@ export function createLastStandScene(game: Game): Scene {
     if (frac < 0.5) crack(0.7, 7.2);
     if (frac < 0.25) crack(1.2, 6.9);
     // Your base behind the wall
-    emoji(ctx, era.base, sx(back + 0.7, d + 0.4), sy(top - 0.55, d + 0.4), tile * 1.1);
+    if (!drawBaseArt(ctx, era.id, sx(back + 0.5, d + 0.4), sy(top, d + 0.4), tile * 1.3))
+      emoji(ctx, era.base, sx(back + 0.7, d + 0.4), sy(top - 0.55, d + 0.4), tile * 1.1);
   };
 
   /** Era-specific texture on the front and side faces. */
@@ -516,12 +541,39 @@ export function createLastStandScene(game: Game): Scene {
     }
   };
 
+  /** Throw progress for a defender: wind up just before a shot, follow through after. */
+  const throwPose = (u: st.Defender) => {
+    const since = clock - (lastFire.get(u.id) ?? -99);
+    if (since < FOLLOW_THROUGH) return RELEASE + (1 - RELEASE) * (since / FOLLOW_THROUGH);
+    const stats = st.defenderStats(stand, u.type);
+    const reach = STAND.wall.front + stats.range;
+    const windup = Math.min(0.3, 0.7 / stats.rate);
+    if (u.cooldown < windup && stand.enemies.some((e) => e.x <= reach))
+      return RELEASE * (1 - Math.max(0, u.cooldown) / windup);
+    return -1;
+  };
+
   const drawDefenders = (ctx: CanvasRenderingContext2D) => {
-    const order = [...stand.defenders].sort((a, b) => st.seatPos(b.seat).z - st.seatPos(a.seat).z);
+    // Back to front, and the back rank before the front rank.
+    const order = [...stand.defenders].sort((a, b) => {
+      const pa = st.seatPos(a.seat);
+      const pb = st.seatPos(b.seat);
+      return pb.z - pa.z || pa.x - pb.x;
+    });
     for (const u of order) {
       const p = st.seatPos(u.seat);
-      const pulse = (firePulse.get(u.id) ?? 0) / 0.16;
       const x = sx(p.x, p.z);
+      const look = UNIT_LOOKS[u.type];
+      if (look) {
+        const feet = sy(STAND.wall.top, p.z);
+        drawShadow(ctx, x, feet, tile * 0.3);
+        ctx.save();
+        ctx.translate(x, feet);
+        drawPerson(ctx, tile * PERSON_SIZE, look, { throw: throwPose(u), t: clock + u.id });
+        ctx.restore();
+        continue;
+      }
+      const pulse = (firePulse.get(u.id) ?? 0) / 0.16;
       const y = sy(p.y, p.z);
       ctx.fillStyle = 'rgba(0,0,0,.2)';
       ctx.beginPath();
@@ -536,7 +588,6 @@ export function createLastStandScene(game: Game): Scene {
       );
     }
   };
-
   const drawEnemies = (ctx: CanvasRenderingContext2D) => {
     const w = VIEW_W * tile;
     for (const e of [...stand.enemies].sort((a, b) => b.z - a.z)) {
@@ -547,6 +598,21 @@ export function createLastStandScene(game: Game): Scene {
       const atWall = e.x <= st.wallStop(e) + 0.01;
       const step = clock * 9 * (e.speed / 1.2) + e.id;
       const ey = sy(st.enemyY(e), e.z) - (atWall ? 0 : Math.abs(Math.sin(step)) * tile * 0.1);
+      if (hasEnemyArt(e.type)) {
+        const s = tile * ENEMY_SIZE * (e.boss ? GAME.boss.size : 1);
+        const feet = sy(STAND.groundY, e.z);
+        const attack = atWall ? (1 - e.hitTimer / STAND.attackEvery + RELEASE) % 1 : null;
+        drawShadow(ctx, ex, feet, s * 0.45);
+        ctx.save();
+        ctx.translate(ex, feet);
+        ctx.scale(-1, 1);
+        if (hitFlash.has(e.id)) ctx.scale(1.1, 0.92);
+        drawEnemyArt(ctx, e.type, s, { walk: step, attack }, e.boss);
+        ctx.restore();
+        if (e.boss || e.hp < e.maxHp)
+          hpBar(ctx, ex, feet - s * enemyArtHeight(e.type) - 8, s * 0.7, 4, e.hp / e.maxHp);
+        continue;
+      }
       const lean = atWall ? -0.35 * Math.max(0, (e.hitTimer / STAND.attackEvery - 0.6) * 2.5) : 0;
       ctx.fillStyle = 'rgba(0,0,0,.2)';
       ctx.beginPath();
@@ -630,6 +696,8 @@ export function createLastStandScene(game: Game): Scene {
       hitFlash.clear();
       lastCooldown.clear();
       firePulse.clear();
+      lastFire.clear();
+      puffs.clear();
       banner = { text: '🏰 Last Stand! Buy defenders, drag 👉 to look', t: -3 };
       buildUi();
       $('hud').hidden = false;
@@ -683,6 +751,7 @@ export function createLastStandScene(game: Game): Scene {
       }
       const fx = paused ? 0 : dt;
       animate(fx);
+      puffs.update(fx * speed);
       popups = popups.filter((p) => (p.t += fx) < 1);
       rings = rings.filter((r) => (r.t += fx) < 0.3);
       if (banner && (banner.t += dt) > 2) banner = null;
@@ -707,7 +776,18 @@ export function createLastStandScene(game: Game): Scene {
         const shot = unitDef(s.unit).shot;
         const x = sx(s.x, s.z);
         const y = sy(s.y, s.z);
-        if (shot.emoji) emoji(ctx, shot.emoji, x, y, tile * shot.size);
+        if (UNIT_LOOKS[s.unit]) {
+          // Thrown in an arc: lift it by how far along it is, and point it the way it's going.
+          let from = shotStart.get(s);
+          if (!from) shotStart.set(s, (from = { x: s.x, y: s.y, z: s.z }));
+          const total = Math.hypot(s.tx - from.x, s.ty - from.y, s.tz - from.z) || 1;
+          const u = Math.min(1, Math.hypot(s.x - from.x, s.y - from.y, s.z - from.z) / total);
+          const arc = Math.min(2.5, total * 0.25) * tile;
+          const dx = sx(s.tx, s.tz) - sx(from.x, from.z);
+          const dy = sy(s.ty, s.tz) - sy(from.y, from.z);
+          const angle = Math.atan2(dy - Math.PI * Math.cos(u * Math.PI) * arc, dx);
+          drawThrown(ctx, s.unit, x, y - Math.sin(u * Math.PI) * arc, tile, angle);
+        } else if (shot.emoji) emoji(ctx, shot.emoji, x, y, tile * shot.size);
         else {
           ctx.fillStyle = shot.color ?? '#fff';
           ctx.beginPath();
@@ -715,6 +795,7 @@ export function createLastStandScene(game: Game): Scene {
           ctx.fill();
         }
       }
+      puffs.draw(ctx);
       for (const r of rings) {
         ctx.strokeStyle = `rgba(255,190,80,${1 - r.t / 0.3})`;
         ctx.lineWidth = 3;

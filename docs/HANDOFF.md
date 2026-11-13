@@ -43,5 +43,13 @@ Why things are the way they are. Keep this current when a decision changes.
   20 × (tier + 1) per boss.
 - **UI is DOM, map is canvas.** Buttons in the panel are built once and only toggled each
   frame, so a kill (gold change) never rebuilds a button mid-tap.
+- **Sprites are drawn in code, not images** (David, Nov 13, Stone Age first). `src/art/sprites.ts`
+  draws cartoon people and monsters with thick outlines, feet at (0, 0), facing right;
+  `src/art/cast.ts` says which tower, defender, enemy and scenery uses which sprite. Anything
+  without an entry still shows its emoji. Throw animations are worked out from the sim's
+  cooldowns (wind up just before a shot, follow through after), so the sim stays unchanged.
+  Enemies are monsters (easy to tell from your people, friendlier to "stop"); later eras add
+  armor, then robot parts. In the Last Stand, defenders fill the front rank along the enemy
+  edge first, then a second rank behind (`seatPos`).
 - **Saves:** one versioned localStorage key (`eraDefense.save`), every access in try/catch.
 - **`?dev` in the URL** starts a run with 99,999 gold for testing.

@@ -1,4 +1,5 @@
 // Canvas drawing helpers. Everything is drawn in CSS pixels; fitCanvas sets up device-pixel scaling.
+import { drawBaseArt, drawDecor } from './art/cast';
 import type { Era } from './sim/data/eras';
 import { createRng } from './sim/rng';
 import type { PreparedMap } from './sim/path';
@@ -187,6 +188,7 @@ function renderGround(map: PreparedMap, era: Era, tile: number, dpr: number): HT
   ctx.fill();
 
   map.decor.forEach((p, i) => {
+    if (drawDecor(ctx, era.id, i, p.x * tile, (p.y + 0.3) * tile, tile)) return;
     ctx.fillStyle = 'rgba(0,0,0,.18)';
     ctx.beginPath();
     ctx.ellipse(p.x * tile, (p.y + 0.25) * tile, tile * 0.3, tile * 0.1, 0, 0, Math.PI * 2);
@@ -209,5 +211,6 @@ export function drawMap(ctx: CanvasRenderingContext2D, map: PreparedMap, era: Er
     groundCache.set(key, ground);
   }
   ctx.drawImage(ground, 0, 0, map.width * tile, map.height * tile);
-  emoji(ctx, era.base, map.base.x * tile, map.base.y * tile, tile * 1.0);
+  if (!drawBaseArt(ctx, era.id, map.base.x * tile, (map.base.y + 0.45) * tile, tile * 1.3))
+    emoji(ctx, era.base, map.base.x * tile, map.base.y * tile, tile * 1.0);
 }

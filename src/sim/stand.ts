@@ -119,14 +119,19 @@ export function createStand(seed: number, opts: StandOptions): Stand {
 // ---------- Where things are ----------
 
 /**
- * Places on top of the wall, filled in order: front row first, from the enemy side back.
- * Two across the wall's thickness, five deep.
+ * Places on top of the wall, filled in order: the front rank along the edge facing the enemies
+ * first (from the near end of the wall to the far end), then a second rank crowds in behind it.
  */
 export function seatPos(seat: number): Pos3 {
-  const { wall, depth } = STAND;
-  const across = seat % 2 === 0 ? wall.front - 0.55 : wall.back + 0.65;
-  const row = Math.floor(seat / 2);
-  return { x: across, y: wall.top - 0.35, z: 0.3 + (row * (depth - 0.6)) / 4 };
+  const { wall, depth, maxDefenders } = STAND;
+  const perRank = Math.ceil(maxDefenders / 2);
+  const rank = Math.floor(seat / perRank);
+  const i = seat % perRank;
+  return {
+    x: wall.front - 0.5 - rank * 0.9,
+    y: wall.top - 0.35,
+    z: 0.3 + (i * (depth - 0.6)) / (perRank - 1),
+  };
 }
 
 /** Height of an enemy's middle. */
