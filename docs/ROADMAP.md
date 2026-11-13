@@ -27,7 +27,9 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 - **Long-running meta loop.** Runs stay short, but permanent progress should last months, with
   many layers of upgrades (idle tower defense style). Details to plan with David.
 - **Eras are long chapters.** Evolving to the next era should take a long time.
-- **4 towers + 4 wall units per era** (24 of each; which ones is TBD with the kids). You get
+- **4 towers + 4 wall units per era** (24 of each; which ones is TBD with the kids). The shop
+  shows only the current era's towers (no locked next-era teasers); ones you can't afford yet
+  are grayed out. You get
   just 1 tower and 1 unit when you enter an era and unlock the rest one at a time.
 - **Older-era towers/units stay usable** but are weaker; tune so a maxed older tower is roughly
   as good as a fresh one from the next era.
