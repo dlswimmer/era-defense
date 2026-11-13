@@ -1,24 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { MAPS } from './data/maps';
-import { cellKey, posAt, prepareMap } from './path';
+import { distToTrail, posAt, prepareMap } from './path';
 
 describe('prepareMap', () => {
   const map = prepareMap(MAPS.meadow!);
 
-  it('walks from the first waypoint to the base', () => {
+  it('walks smoothly from the entrance to the base', () => {
     expect(posAt(map, 0)).toEqual(map.points[0]);
-    expect(posAt(map, map.length)).toEqual(map.points[map.points.length - 1]);
-    expect(posAt(map, map.length + 5)).toEqual(map.points[map.points.length - 1]);
+    expect(posAt(map, map.length)).toEqual(map.base);
+    expect(posAt(map, map.length + 5)).toEqual(map.base);
+    // Small steps along the trail never jump.
+    for (let d = 0.1; d < map.length; d += 0.1) {
+      const a = posAt(map, d - 0.1);
+      const b = posAt(map, d);
+      expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeLessThanOrEqual(0.1001);
+    }
   });
 
-  it('marks path cells inside the grid, including the base', () => {
-    expect(map.pathCells.has(cellKey(map.base.col, map.base.row))).toBe(true);
-    expect(map.pathCells.has(cellKey(1, 0))).toBe(true);
-    expect(map.pathCells.has(cellKey(5, 2))).toBe(true);
-    expect(map.pathCells.has(cellKey(5, 3))).toBe(false);
+  it('is a decent length and stays on the map after the entrance', () => {
+    expect(map.length).toBeGreaterThan(30);
+    expect(map.length).toBeLessThan(45);
+    for (let d = 2; d < map.length; d += 0.25) {
+      const p = posAt(map, d);
+      expect(p.x).toBeGreaterThan(0);
+      expect(p.x).toBeLessThan(map.width);
+      expect(p.y).toBeLessThan(map.height);
+    }
   });
 
-  it('never puts decorations on the path', () => {
-    for (const key of map.decorCells) expect(map.pathCells.has(key)).toBe(false);
+  it('measures distance to the trail', () => {
+    for (const p of map.points) expect(distToTrail(map, p.x, p.y)).toBeCloseTo(0, 5);
+    expect(distToTrail(map, 0.6, 3)).toBeGreaterThan(1);
+  });
+
+  it('never puts decorations on the trail', () => {
+    for (const p of map.decor) expect(distToTrail(map, p.x, p.y)).toBeGreaterThan(map.pathWidth);
   });
 });

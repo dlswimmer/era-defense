@@ -21,7 +21,7 @@ export interface Meta {
 }
 
 const KEY = 'eraDefense.save';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export function defaultMeta(): Meta {
   return {
@@ -41,11 +41,15 @@ export function migrate(raw: unknown): Meta {
   const r = raw as Partial<Meta> & { votes?: unknown };
   // v1 had a Phase 2 style vote; it was decided (side view), so drop it.
   delete r.votes;
+  // v2 had Thick Walls (wall HP). Phase 1 has no wall now, so those levels become Strong Arms.
+  const upgrades: Record<string, number> = { ...(r.upgrades ?? {}) };
+  if (upgrades.wall) upgrades.power = (upgrades.power ?? 0) + upgrades.wall;
+  delete upgrades.wall;
   return {
     ...base,
     ...r,
     best: { ...base.best, ...(r.best ?? {}) },
-    upgrades: { ...(r.upgrades ?? {}) },
+    upgrades,
     relics: typeof r.relics === 'number' ? r.relics : 0,
     ideas: Array.isArray(r.ideas) ? r.ideas : [],
     version: SAVE_VERSION,

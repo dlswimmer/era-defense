@@ -1,4 +1,4 @@
-// Shown after the outer wall falls. Phase 2 (the side-view Last Stand) will start from here in
+// Shown after the first enemy gets through. Phase 2 (the side-view Last Stand) will start from here in
 // M2. For now it shows the run's results and the Relics earned.
 import type { Game, RunSummary, Scene } from '../game';
 import { ERAS } from '../sim/data/eras';
@@ -27,7 +27,7 @@ export function createBreachScene(game: Game): Scene {
       el(
         'div',
         { class: 'card' },
-        el('h2', {}, '💥 The wall fell!'),
+        el('h2', {}, '🚨 They got through!'),
         summary.newBest
           ? el('p', { style: 'color:var(--gold);font-weight:800' }, '🏆 New best!')
           : '',

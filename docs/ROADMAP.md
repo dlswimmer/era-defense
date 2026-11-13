@@ -14,6 +14,13 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 - **Roguelite loop, first pass (part of M3):** Relics 🦴 after every run, Upgrades screen with
   Evolve (unlock the next era), Treasure (+start gold) and Thick Walls (+wall HP). Waves flow on
   their own with a ⏩ early-call bonus. First run lasts about 1.5 minutes.
+- **Free-placement Phase 1 (Nov 13):** enemies follow a smooth, winding dirt trail; towers go
+  anywhere on the grass that isn't the trail, a decoration, the base or another tower. Pick a
+  tower in the shop and drag it onto the map (or tap it, then tap the map); the range circle
+  shows white where it fits and red where it doesn't. On touch the tower floats above your
+  finger. Grass, trail and scenery are drawn once per era and cached.
+- **First leak ends Phase 1 (Nov 13):** no wall HP bar any more. Thick Walls became Strong Arms
+  (+10% tower damage per level; old saves keep their levels).
 
 ## Decided in planning (Nov 13) — not built yet
 
@@ -24,8 +31,9 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   just 1 tower and 1 unit when you enter an era and unlock the rest one at a time.
 - **Older-era towers/units stay usable** but are weaker; tune so a maxed older tower is roughly
   as good as a fresh one from the next era.
-- **Phase 1 has no wall HP.** The first enemy that reaches the base switches to Phase 2.
-  (Build this together with Phase 2 so the leak has somewhere to go.)
+- **Harder maps for later.** Once players have strong upgrades, new harder maps (shorter
+  trails, more bends to cover) keep Phase 1 short instead of letting it run for 20 minutes.
+  A map is one entry in `src/sim/data/maps.ts`.
 - **Phase 2 is a side view**: your wall on the left, enemies come from the right, and you
   build units on the wall using the War Chest.
 - **Graphics pass** wanted later.
@@ -34,7 +42,8 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 
 - **M1 balance pass with the kids.** Knobs: `src/sim/data/game.ts`, `waves.ts`, `towers.ts`,
   `enemies.ts`, `eras.ts`. Check with `npm run balance` after changes.
-- **Graphics pass** (David wants better art than plain emoji).
+- **Graphics pass** (David wants better art than plain emoji). The trail and grass got a first
+  pass; towers and enemies are still emoji.
 - **M2 Breach + Last Stand:** side-on 2.5D view of the base. The breach scene
   (`src/scenes/breach.ts`) already receives the run summary, including the War Chest and era.
 - **M3 rest:** more upgrades (tower mastery, heroes, base blueprints), Relics from Phase 2 time.
@@ -46,4 +55,4 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 1. One save per kid on a shared device?
 2. Game name (let the kids vote).
 
-Decided: Phase 2 is side-on 2.5D; the breach trigger is the wall HP bar; Evolve is a Relic upgrade.
+Decided: Phase 2 is side-on 2.5D; the first leak ends Phase 1; Evolve is a Relic upgrade.

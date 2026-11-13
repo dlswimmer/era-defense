@@ -5,8 +5,14 @@ Why things are the way they are. Keep this current when a decision changes.
 - **Stack: TypeScript + Vite, not plain JS.** The original plan said "no build step", but David
   asked for the same setup as his other games (node-wars, flux-engine). GitHub Actions builds
   and deploys to Pages on every push to `main`, so pushing still deploys.
-- **Canvas + emoji, no Phaser.** The game is a simple grid; plain Canvas keeps the bundle tiny
-  (about 10 KB gzipped) and loads instantly on phones.
+- **Canvas + emoji, no Phaser.** Plain Canvas keeps the bundle tiny (about 10 KB gzipped) and
+  loads instantly on phones.
+- **Free placement, not a grid** (David, Nov 13: "more like Bloons"). The world is still
+  measured in tiles (the map is 10×13 of them, ranges and speeds use the same unit), but towers
+  sit at any (x, y). The trail is a Catmull-Rom curve through the map's control points
+  (`smoothTrail` in `src/sim/path.ts`); `isBuildable` keeps towers off the trail, decorations,
+  the base and each other (`GAME.towerRadius`). Shop buttons release pointer capture so a
+  finger can drag from the button onto the canvas; `main.ts` forwards page-wide moves/ups.
 - **Sim is pure.** `src/sim/` has no DOM. The scene (`src/scenes/outerDefense.ts`) calls
   `step()` and turns `run.events` into popups, beams and screen shake. This lets the bot in
   `src/sim/playtest/bot.ts` play whole runs in tests.
@@ -20,9 +26,10 @@ Why things are the way they are. Keep this current when a decision changes.
 - **Relics** = wave reached + 2 per boss stopped (`relicsEarned`).
 - **Phase 2 will be a side-on 2.5D view** (David's call), to feel different from the top-down
   Phase 1. The results screen shows a "coming soon" teaser in its place.
-- **Breach = outer wall HP hits 0** (plan's recommended option). Enemies that reach the base
-  hurt the wall: 1 normal, 2 heavy, 5 boss.
-- **Waves never stop getting harder**, so every run ends in a breach (and Phase 2). Enemy HP
+- **Breach = the first enemy that reaches the base** (David, Nov 13). No wall HP in Phase 1;
+  `era.wallHp` is kept for the Last Stand. Thick Walls became Strong Arms (save v3 migrates
+  the levels). The balance test now checks every era is a short run (1-5 minutes).
+- **Waves never stop getting harder**, so every run ends with a leak (and Phase 2). Enemy HP
   ramps within each 5-wave tier, so the end of a tier is the wall your era has to beat.
 - **War Chest** is separate from gold and only counts up: 1 + tier per kill, plus
   20 × (tier + 1) per boss.

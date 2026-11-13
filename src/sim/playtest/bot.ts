@@ -1,6 +1,7 @@
 // A simple bot that plays Phase 1, used by tests and `npm run balance` to check pacing.
 import { towerDef, TOWER_IDS, type TowerId } from '../data/towers';
 import { relicsEarned, type RunOptions } from '../data/metaUpgrades';
+import { posAt, type Point } from '../path';
 import * as sim from '../run';
 
 export interface BotResult {
@@ -14,26 +15,36 @@ export interface BotResult {
   towers: number;
 }
 
-/** How many path tiles are within `range` of a cell: a rough "how good is this spot". */
-function coverage(run: sim.Run, col: number, row: number, range: number): number {
-  let n = 0;
-  for (const key of run.map.pathCells) {
-    const [c, r] = key.split(',').map(Number) as [number, number];
-    if (Math.hypot(c - col, r - row) <= range) n++;
+/** Points every quarter tile along the trail, for scoring spots. */
+const trailSamples = new WeakMap<sim.Run['map'], Point[]>();
+function samples(run: sim.Run): Point[] {
+  let pts = trailSamples.get(run.map);
+  if (!pts) {
+    pts = [];
+    for (let d = 0; d <= run.map.length; d += 0.25) pts.push(posAt(run.map, d));
+    trailSamples.set(run.map, pts);
   }
+  return pts;
+}
+
+/** How much trail is within `range` of a spot: a rough "how good is this spot". */
+function coverage(run: sim.Run, x: number, y: number, range: number): number {
+  let n = 0;
+  for (const p of samples(run)) if (Math.hypot(p.x - x, p.y - y) <= range) n++;
   return n;
 }
 
-function bestSpot(run: sim.Run, range: number): { col: number; row: number } | null {
-  let best: { col: number; row: number } | null = null;
+/** The free spot (on a half-tile grid) that covers the most trail. */
+export function bestSpot(run: sim.Run, range: number): Point | null {
+  let best: Point | null = null;
   let bestScore = 0;
-  for (let row = 0; row < run.map.rows; row++) {
-    for (let col = 0; col < run.map.cols; col++) {
-      if (!sim.isBuildable(run, col, row)) continue;
-      const score = coverage(run, col, row, range);
+  for (let y = 0.5; y < run.map.height; y += 0.5) {
+    for (let x = 0.5; x < run.map.width; x += 0.5) {
+      if (!sim.isBuildable(run, x, y)) continue;
+      const score = coverage(run, x, y, range);
       if (score > bestScore) {
         bestScore = score;
-        best = { col, row };
+        best = { x, y };
       }
     }
   }
@@ -51,7 +62,7 @@ export function spend(run: sim.Run) {
     )[0];
     if (pick && run.towers.length < 24) {
       const spot = bestSpot(run, towerDef(pick).levels[0].range);
-      if (spot && sim.build(run, pick, spot.col, spot.row)) continue;
+      if (spot && sim.build(run, pick, spot.x, spot.y)) continue;
     }
 
     const upgradable = run.towers
@@ -66,7 +77,7 @@ export function spend(run: sim.Run) {
   }
 }
 
-/** Plays one run until the wall falls (or a time limit, in seconds of game time). */
+/** Plays one run until an enemy gets through (or a time limit, in seconds of game time). */
 export function playRun(
   seed: number,
   options: Partial<RunOptions> = {},
