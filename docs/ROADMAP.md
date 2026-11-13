@@ -27,13 +27,14 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 - **First leak ends Phase 1 (Nov 13):** no wall HP bar any more. Thick Walls became Strong Arms
   (+10% tower damage per level; old saves keep their levels).
 
-- **Last Stand v1 (Phase 2, Nov 13):** after the first leak, a side view of the wall (HP =
-  era wall × 15). Enemies walk in from the right, starting with the wave that broke through,
-  and hit the wall. Four spots on the wall take defenders bought with the War Chest ⚔️ (one
-  per era for now: Spear Thrower, Boomerang Crew, Boiling Oil, Musket Line, Dynamite, Drone),
-  with 3 levels and sell. Stopping enemies refills the War Chest. When the wall falls, the
-  results show both phases; Relics = Phase 1 + 1 per wave held at the wall + 2 per boss.
-  Bot runs last 40-140 s.
+- **Last Stand v2 (Phase 2, Nov 13):** after the first leak, a 2.5D side view of the wall
+  (HP = era wall × 15), styled per era: log palisade, sandstone, castle stone, brick, concrete,
+  energy shield. Enemies start about 2 screens away on a 3-screen field; drag (or scroll, or tap
+  the mini-map) to see them coming. Buying a defender with the War Chest ⚔️ puts it on the wall
+  by itself (10 places; one defender type per era for now). No per-defender upgrades: team
+  boosts instead (💥 Power, ⚡ Speed, 🎯 Reach, 🧱 Repair), pricier each level and in later eras.
+  Relics = Phase 1 + 1 per wave held at the wall + 2 per boss. Bot runs last 40-80 s.
+  `?stand=<era>` jumps straight into a Last Stand for testing.
 
 ## Decided in planning (Nov 13) — not built yet
 

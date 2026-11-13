@@ -1,22 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import { ERAS } from './data/eras';
-import { STAND } from './data/stand';
+import { BOOSTS, STAND, boostEffect } from './data/stand';
 import { unitDef } from './data/units';
 import * as st from './stand';
 
 const fresh = (chest = 100, era = 0) => st.createStand(1, { era, wave: 7, chest });
+const boost = (id: string) => BOOSTS.find((b) => b.id === id)!;
 
 describe('Last Stand defenders', () => {
-  it('cost War Chest and fill the wall spots one by one', () => {
-    const stand = fresh();
+  it('cost War Chest and take the next free place on the wall', () => {
+    const stand = fresh(1000);
     const cost = unitDef('spear').cost;
-    expect(st.hire(stand, 'spear')!.slot).toBe(0);
-    expect(st.hire(stand, 'spear')!.slot).toBe(1);
-    expect(stand.chest).toBe(100 - 2 * cost);
-    expect(st.hire(stand, 'spear', 1)).toBeNull(); // taken
-    expect(st.hire(stand, 'spear', 3)!.slot).toBe(3);
-    expect(st.hire(stand, 'spear')!.slot).toBe(2);
-    expect(st.hire(stand, 'spear')).toBeNull(); // the wall is full
+    const a = st.hire(stand, 'spear')!;
+    const b = st.hire(stand, 'spear')!;
+    expect([a.seat, b.seat]).toEqual([0, 1]);
+    expect(stand.chest).toBe(1000 - 2 * cost);
+    // Every place is different and they all fit on the wall.
+    const seats = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(st.seatPos);
+    for (const p of seats) {
+      expect(p.x).toBeGreaterThan(STAND.wall.back);
+      expect(p.x).toBeLessThan(STAND.wall.front);
+      expect(p.z).toBeGreaterThan(0);
+      expect(p.z).toBeLessThan(STAND.depth);
+    }
+    expect(new Set(seats.map((p) => `${p.x},${p.z}`)).size).toBe(10);
+  });
+
+  it('stop at a full wall', () => {
+    const stand = fresh(10_000);
+    for (let i = 0; i < STAND.maxDefenders; i++) expect(st.hire(stand, 'spear')).not.toBeNull();
+    expect(st.wallFull(stand)).toBe(true);
+    expect(st.hire(stand, 'spear')).toBeNull();
   });
 
   it("can't be hired without enough War Chest or before their era", () => {
@@ -27,18 +41,44 @@ describe('Last Stand defenders', () => {
     expect(st.hire(fresh(1000), 'boomerang')).toBeNull();
     expect(st.hire(fresh(1000, 1), 'boomerang')).not.toBeNull();
   });
+});
 
-  it('upgrade twice and sell for 70%', () => {
+describe('team boosts', () => {
+  it('make every defender stronger and cost more each level', () => {
     const stand = fresh(1000);
-    const u = st.hire(stand, 'spear')!;
-    expect(st.promote(stand, u)).toBe(true);
-    expect(st.promote(stand, u)).toBe(true);
-    expect(st.promote(stand, u)).toBe(false);
-    const before = stand.chest;
-    const value = st.dismiss(stand, u);
-    expect(value).toBe(Math.floor(u.spent * 0.7));
-    expect(stand.chest).toBe(before + value);
-    expect(stand.slots[0]).toBeNull();
+    const before = st.defenderStats(stand, 'spear');
+    const first = st.boostCost(stand, boost('power'))!;
+    expect(st.buyBoost(stand, 'power')).toBe(true);
+    expect(st.boostCost(stand, boost('power'))!).toBeGreaterThan(first);
+    expect(stand.chest).toBe(1000 - first);
+    st.buyBoost(stand, 'speed');
+    st.buyBoost(stand, 'reach');
+    const after = st.defenderStats(stand, 'spear');
+    expect(after.dmg).toBeCloseTo(before.dmg * boostEffect.power(1));
+    expect(after.rate).toBeCloseTo(before.rate * boostEffect.speed(1));
+    expect(after.range).toBeCloseTo(before.range + boostEffect.reach(1));
+  });
+
+  it('stop at their max level', () => {
+    const stand = fresh(100_000);
+    const reach = boost('reach');
+    for (let i = 0; i < reach.max!; i++) expect(st.buyBoost(stand, 'reach')).toBe(true);
+    expect(st.boostCost(stand, reach)).toBeNull();
+    expect(st.buyBoost(stand, 'reach')).toBe(false);
+  });
+
+  it('repair heals the wall, but only when it is hurt', () => {
+    const stand = fresh(1000);
+    expect(st.buyBoost(stand, 'repair')).toBe(false);
+    stand.wallHp = 10;
+    expect(st.buyBoost(stand, 'repair')).toBe(true);
+    expect(stand.wallHp).toBe(10 + Math.round(stand.wallMax * boostEffect.repair));
+  });
+
+  it('cost more in later eras', () => {
+    expect(st.boostCost(fresh(0, 3), boost('power'))!).toBeGreaterThan(
+      st.boostCost(fresh(0, 0), boost('power'))!,
+    );
   });
 });
 
@@ -49,11 +89,12 @@ describe('the wall', () => {
     expect(stand.wave).toBe(6);
   });
 
-  it('gives you time to set up, then enemies walk in and wear it down until it falls', () => {
+  it('enemies start far away, walk in and wear the wall down until it falls', () => {
     const stand = fresh(0);
     stand.chest = 0;
-    for (let t = 0; t < STAND.firstWaveIn - 0.5; t += 0.05) st.stepStand(stand, 0.05);
-    expect(stand.enemies).toHaveLength(0);
+    for (let t = 0; t < 3; t += 0.05) st.stepStand(stand, 0.05);
+    expect(stand.enemies.length).toBeGreaterThan(0);
+    for (const e of stand.enemies) expect(e.x).toBeGreaterThan(STAND.view.width * 2);
     while (!stand.over) st.stepStand(stand, 0.05);
     expect(stand.wallHp).toBe(0);
     expect(stand.events.some((e) => e.type === 'fallen')).toBe(true);
@@ -64,7 +105,7 @@ describe('the wall', () => {
     const stand = fresh(100);
     for (let i = 0; i < 4; i++) st.hire(stand, 'spear');
     const chest = stand.chest;
-    for (let t = 0; t < 30 && !stand.over; t += 0.05) st.stepStand(stand, 0.05);
+    for (let t = 0; t < 60 && !stand.over; t += 0.05) st.stepStand(stand, 0.05);
     expect(stand.kills).toBeGreaterThan(0);
     expect(stand.chest).toBeGreaterThan(chest);
   });

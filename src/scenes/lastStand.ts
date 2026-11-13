@@ -1,5 +1,7 @@
-// Phase 2: the Last Stand. A side view of the wall: enemies walk in from the right and you
-// put defenders on the wall with the War Chest from Phase 1. Draws src/sim/stand.ts.
+// Phase 2: the Last Stand. A side view of the wall with a little depth (2.5D). Enemies walk in
+// from far to the right; drag the field (or scroll) to see them coming. Buy defenders with the
+// War Chest and they take a place on the wall; buy team boosts to make them all stronger.
+// Draws src/sim/stand.ts.
 import type { Game, RunSummary, Scene } from '../game';
 import { emoji, fitCanvas, hpBar, shade, text } from '../render';
 import { saveMeta } from '../save';
@@ -7,17 +9,17 @@ import { ERAS, type Era } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
 import { GAME } from '../sim/data/game';
 import { runOptions } from '../sim/data/metaUpgrades';
-import { STAND } from '../sim/data/stand';
-import { sellValue } from '../sim/data/towers';
+import { BOOSTS, STAND, type Boost } from '../sim/data/stand';
 import { UNIT_IDS, unitDef, type UnitId } from '../sim/data/units';
+import { createRng } from '../sim/rng';
 import * as st from '../sim/stand';
 import { openIdeaBox } from '../ui/ideas';
 import { $, el, setDisabled, setText } from '../ui/dom';
-import { createRng } from '../sim/rng';
 
 interface Popup {
   x: number;
   y: number;
+  z: number;
   text: string;
   color: string;
   t: number;
@@ -25,16 +27,22 @@ interface Popup {
 }
 
 const FALL_TIME = 2.6;
+const VIEW_W = STAND.view.width;
+const VIEW_H = STAND.view.height;
+const MAX_CAM = STAND.fieldWidth - VIEW_W;
+/** The mini-map strip along the top of the screen, in screen tiles. */
+const MINI = { x: 0.3, y: 0.25, w: VIEW_W - 0.6, h: 0.45 };
 
 export function createLastStandScene(game: Game): Scene {
   let stand: st.Stand;
   let phase1: RunSummary;
   let tile = 32;
+  let camX = 0;
+  let drag: { px: number; camX: number; moved: boolean } | null = null;
   let speed = 1;
   let paused = false;
-  let selected: number | null = null; // wall spot
   let popups: Popup[] = [];
-  let rings: { x: number; y: number; r: number; t: number }[] = [];
+  let rings: { x: number; y: number; z: number; r: number; t: number }[] = [];
   let shake = 0;
   let fallTimer = -1;
   let banner: { text: string; t: number } | null = null;
@@ -44,7 +52,11 @@ export function createLastStandScene(game: Game): Scene {
   const lastCooldown = new Map<number, number>();
   const firePulse = new Map<number, number>();
 
-  // ---------- HUD ----------
+  // Screen position (CSS pixels) of a point on the field.
+  const sx = (x: number, z = 0) => (x - camX + z * STAND.skew) * tile;
+  const sy = (y: number, z = 0) => (y - z * STAND.skew) * tile;
+
+  // ---------- HUD and panel ----------
   const hud = {
     chest: el('span', { class: 'hud-chip gold' }),
     wave: el('span', { class: 'hud-chip' }),
@@ -63,9 +75,8 @@ export function createLastStandScene(game: Game): Scene {
     ),
   };
   ctl.wave.disabled = true;
-  const context = el('div', { class: 'context' });
-  let costButtons: { btn: HTMLButtonElement; cost: () => number | null; needsSpot?: boolean }[] =
-    [];
+  const context = el('div', { class: 'context stand-shop' });
+  let buttons: { btn: HTMLButtonElement; can: () => boolean }[] = [];
 
   const buildUi = () => {
     $('hud').replaceChildren(
@@ -84,75 +95,55 @@ export function createLastStandScene(game: Game): Scene {
     );
   };
 
-  const renderContext = () => {
-    costButtons = [];
-    const unit = selected !== null ? stand.slots[selected] : null;
-    context.replaceChildren(unit ? unitInfo(unit) : shop());
-  };
-
-  const shop = () => {
+  /** Defenders and boosts. Rebuilt after each purchase; enabled/disabled every frame. */
+  const renderShop = () => {
+    buttons = [];
     const grid = el('div', { class: 'shop' });
     for (const id of UNIT_IDS) {
       if (!st.isUnitUnlocked(stand, id)) continue;
       const def = unitDef(id);
+      const count = stand.defenders.filter((d) => d.type === id).length;
       const btn = el(
         'button',
         { class: 'btn', onclick: () => onHire(id) },
         el('span', { class: 'em' }, def.emoji),
-        el('span', { class: 'nm' }, def.name),
+        el('span', { class: 'nm' }, count ? `${def.name} ×${count}` : def.name),
         el('span', { class: 'cost' }, `⚔️${def.cost}`),
       );
-      costButtons.push({ btn, cost: () => def.cost, needsSpot: true });
+      buttons.push({ btn, can: () => st.canHire(stand, id) });
       grid.append(btn);
     }
-    return grid;
+    for (const boost of BOOSTS) {
+      const cost = st.boostCost(stand, boost);
+      const level = stand.boosts[boost.id];
+      const btn = el(
+        'button',
+        { class: 'btn boost', onclick: () => onBoost(boost) },
+        el('span', { class: 'em' }, boost.emoji),
+        el(
+          'span',
+          { class: 'nm' },
+          boost.id === 'repair' || !level ? boost.name : `${boost.name} ${level}`,
+        ),
+        el(
+          'span',
+          { class: 'cost' },
+          cost === null ? (boost.id === 'repair' ? 'Full' : 'Max') : `⚔️${cost}`,
+        ),
+      );
+      buttons.push({
+        btn,
+        can: () => {
+          const c = st.boostCost(stand, boost);
+          return c !== null && stand.chest >= c && !stand.over;
+        },
+      });
+      grid.append(btn);
+    }
+    context.replaceChildren(grid);
   };
 
-  const unitInfo = (unit: st.Defender) => {
-    const def = unitDef(unit.type);
-    const stats = def.levels[unit.level]!;
-    const next = def.levels[unit.level + 1];
-    const upCost = st.nextUnitCost(unit);
-    const upBtn = el(
-      'button',
-      { class: 'btn primary', onclick: () => onPromote(unit) },
-      upCost === null ? '⭐ Max' : `⬆️ ⚔️${upCost}`,
-    );
-    if (upCost === null) upBtn.disabled = true;
-    else costButtons.push({ btn: upBtn, cost: () => st.nextUnitCost(unit) });
-    const line = (label: string, now: number, then?: number) =>
-      `${label} ${fmt(now)}${then !== undefined && then !== now ? ` → ${fmt(then)}` : ''}`;
-    return el(
-      'div',
-      { class: 'info' },
-      el(
-        'div',
-        { class: 'txt' },
-        el('b', {}, `${def.emoji} ${def.name} ${'⭐'.repeat(unit.level + 1)}`),
-        el(
-          'div',
-          {},
-          [
-            line('💥', stats.dmg, next?.dmg),
-            line('🎯', stats.range, next?.range),
-            line('⏱️', stats.rate, next?.rate),
-          ].join('  ·  '),
-        ),
-        def.by ? el('div', { class: 'credit' }, `Designed by ${def.by}`) : '',
-      ),
-      el(
-        'div',
-        { class: 'info-actions' },
-        upBtn,
-        el(
-          'button',
-          { class: 'btn danger', onclick: () => onDismiss(unit) },
-          `Sell ⚔️${sellValue(unit.spent)}`,
-        ),
-      ),
-    );
-  };
-
+  let repairWasPossible = false;
   const updateUi = () => {
     const era = ERAS[stand.era]!;
     setText(hud.chest, `⚔️ ${stand.chest}`);
@@ -168,11 +159,13 @@ export function createLastStandScene(game: Game): Scene {
     else setText(ctl.wave, `Next wave in ${Math.ceil(Math.max(0, stand.nextWaveIn))}…`);
     setText(ctl.speed, `${speed}×`);
     setText(ctl.pause, paused ? '▶️' : '⏸️');
-    const freeSpot = (selected !== null && !stand.slots[selected]) || st.firstFreeSlot(stand) >= 0;
-    for (const { btn, cost, needsSpot } of costButtons) {
-      const c = cost();
-      setDisabled(btn, c === null || stand.chest < c || stand.over || (!!needsSpot && !freeSpot));
+    // Repair's label flips between "Full" and a price as the wall gets hurt.
+    const repairPossible = stand.wallHp < stand.wallMax;
+    if (repairPossible !== repairWasPossible) {
+      repairWasPossible = repairPossible;
+      renderShop();
     }
+    for (const { btn, can } of buttons) setDisabled(btn, !can());
   };
 
   // ---------- Actions ----------
@@ -183,41 +176,37 @@ export function createLastStandScene(game: Game): Scene {
     openIdeaBox(game, () => (paused = was));
   };
   const onHire = (id: UnitId) => {
-    const slot = selected !== null && !stand.slots[selected] ? selected : st.firstFreeSlot(stand);
-    const unit = st.hire(stand, id, slot);
+    const unit = st.hire(stand, id);
     if (!unit) return;
-    const p = st.unitPos(unit.slot);
-    addPopup(p.x, p.y - 0.5, `-${unitDef(id).cost}⚔️`, '#ffd34d');
-    selected = null;
-    renderContext();
+    const p = st.seatPos(unit.seat);
+    addPopup(p.x, p.y - 0.6, p.z, `-${unitDef(id).cost}⚔️`, '#ffd34d');
+    if (camX > VIEW_W * 0.5) camX = 0; // show where they went
+    renderShop();
   };
-  const onPromote = (unit: st.Defender) => {
-    if (st.promote(stand, unit)) renderContext();
-  };
-  const onDismiss = (unit: st.Defender) => {
-    const value = st.dismiss(stand, unit);
-    const p = st.unitPos(unit.slot);
-    addPopup(p.x, p.y - 0.5, `+${value}⚔️`, '#ffd34d');
-    selected = null;
-    renderContext();
+  const onBoost = (boost: Boost) => {
+    const cost = st.boostCost(stand, boost);
+    if (!st.buyBoost(stand, boost.id)) return;
+    const msg = boost.id === 'repair' ? '🧱 Repaired!' : `${boost.emoji} ${boost.name} up!`;
+    banner = { text: `${msg}  -${cost}⚔️`, t: 0 };
+    renderShop();
   };
 
-  const addPopup = (x: number, y: number, s: string, color: string, size = 0.32) =>
-    popups.push({ x, y, text: s, color, t: 0, size });
+  const addPopup = (x: number, y: number, z: number, s: string, color: string, size = 0.32) =>
+    popups.push({ x, y, z, text: s, color, t: 0, size });
 
   const handleEvents = () => {
     for (const ev of stand.events) {
       switch (ev.type) {
         case 'kill':
-          addPopup(ev.x, ev.y - 0.3, `+${ev.chest}⚔️`, '#ffd34d', ev.boss ? 0.5 : 0.3);
+          addPopup(ev.x, ev.y - 0.3, ev.z, `+${ev.chest}⚔️`, '#ffd34d', ev.boss ? 0.5 : 0.3);
           if (ev.boss) shake = Math.max(shake, 0.3);
           break;
         case 'wallHit':
-          addPopup(STAND.wallX + 0.2, STAND.groundY - 1.2, `-${ev.dmg}`, '#ff5d5d', 0.34);
-          shake = Math.max(shake, ev.dmg >= 5 ? 0.35 : 0.12);
+          addPopup(STAND.wall.front + 0.3, STAND.groundY - 1.2, ev.z, `-${ev.dmg}`, '#ff5d5d');
+          if (camX < STAND.wall.front + 1) shake = Math.max(shake, ev.dmg >= 5 ? 0.35 : 0.12);
           break;
         case 'splash':
-          rings.push({ x: ev.x, y: ev.y, r: ev.radius, t: 0 });
+          rings.push({ x: ev.x, y: STAND.groundY, z: ev.z, r: ev.radius, t: 0 });
           break;
         case 'waveStart':
           banner = { text: ev.boss ? `👑 Boss wave ${ev.wave}!` : `Wave ${ev.wave}`, t: 0 };
@@ -225,8 +214,7 @@ export function createLastStandScene(game: Game): Scene {
         case 'fallen':
           fallTimer = 0;
           shake = 1;
-          selected = null;
-          renderContext();
+          camX = 0;
           break;
       }
     }
@@ -235,13 +223,11 @@ export function createLastStandScene(game: Game): Scene {
 
   const animate = (fx: number) => {
     clock += fx * speed;
-    for (const [id, t] of hitFlash) {
-      if (t - fx <= 0) hitFlash.delete(id);
-      else hitFlash.set(id, t - fx);
-    }
-    for (const [id, t] of firePulse) {
-      if (t - fx <= 0) firePulse.delete(id);
-      else firePulse.set(id, t - fx);
+    for (const map of [hitFlash, firePulse]) {
+      for (const [id, t] of map) {
+        if (t - fx <= 0) map.delete(id);
+        else map.set(id, t - fx);
+      }
     }
     const alive = new Set<number>();
     for (const e of stand.enemies) {
@@ -251,8 +237,7 @@ export function createLastStandScene(game: Game): Scene {
       lastHp.set(e.id, e.hp);
     }
     for (const id of lastHp.keys()) if (!alive.has(id)) lastHp.delete(id);
-    for (const u of stand.slots) {
-      if (!u) continue;
+    for (const u of stand.defenders) {
       if (u.cooldown > (lastCooldown.get(u.id) ?? 0) + 0.01) firePulse.set(u.id, 0.16);
       lastCooldown.set(u.id, u.cooldown);
     }
@@ -281,179 +266,291 @@ export function createLastStandScene(game: Game): Scene {
   const onVisibility = () => {
     if (document.hidden) paused = true;
   };
+  const onWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    setCam(camX + delta / tile);
+  };
+  const setCam = (x: number) => (camX = Math.max(0, Math.min(MAX_CAM, x)));
 
   // ---------- Drawing ----------
-  const W = STAND.width;
-  const H = STAND.height;
+  const poly = (ctx: CanvasRenderingContext2D, pts: [number, number, number][]) => {
+    ctx.beginPath();
+    pts.forEach(([x, y, z], i) =>
+      i ? ctx.lineTo(sx(x, z), sy(y, z)) : ctx.moveTo(sx(x, z), sy(y, z)),
+    );
+    ctx.closePath();
+  };
 
-  const drawScene = (ctx: CanvasRenderingContext2D, era: Era) => {
-    const w = W * tile;
-    const h = H * tile;
-    const gy = STAND.groundY * tile;
+  const drawBackdrop = (ctx: CanvasRenderingContext2D, era: Era) => {
+    const w = VIEW_W * tile;
+    const h = VIEW_H * tile;
+    const horizon = sy(STAND.groundY, STAND.depth);
     const night = era.id === 'future';
-    const sky = ctx.createLinearGradient(0, 0, 0, gy);
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
     sky.addColorStop(0, night ? '#0b1530' : '#6fb7f0');
-    sky.addColorStop(1, night ? '#3a4a7a' : '#cfe9ff');
+    sky.addColorStop(1, night ? '#3a4a7a' : '#d6edff');
     ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, gy);
-    emoji(ctx, night ? '🌙' : '☀️', w - tile * 1.1, tile * 1.1, tile * 1.1);
-    for (let i = 0; i < 3; i++) {
-      const x = ((clock * 0.15 + i * 3.7) % (W + 3)) - 1.5;
-      emoji(ctx, '☁️', x * tile, (1.2 + i * 0.9) * tile, tile * (0.9 + i * 0.2));
+    ctx.fillRect(0, 0, w, horizon + 2);
+    emoji(ctx, night ? '🌙' : '☀️', w - tile * 1.3 - camX * tile * 0.05, tile * 2.9, tile * 1.1);
+    for (let i = 0; i < 6; i++) {
+      const x = ((i * 6.3 + clock * 0.12 - camX * 0.25) % 36) - 2;
+      emoji(ctx, '☁️', x * tile, (1.6 + (i % 3) * 0.9) * tile, tile * (0.9 + (i % 3) * 0.25));
     }
-    // Far hills
-    ctx.fillStyle = shade(era.ground, -0.08);
-    ctx.globalAlpha = 0.7;
-    for (let i = 0; i < 4; i++) {
+    // Far hills drift slower than the ground (parallax)
+    ctx.fillStyle = shade(era.ground, -0.1);
+    ctx.globalAlpha = 0.75;
+    for (let i = 0; i < 9; i++) {
+      const x = (i * 4.2 - camX * 0.5) * tile;
       ctx.beginPath();
-      ctx.ellipse((1 + i * 3) * tile, gy, tile * 2.6, tile * (1.2 + (i % 2) * 0.6), 0, Math.PI, 0);
+      ctx.ellipse(x, horizon, tile * 2.8, tile * (1.3 + (i % 3) * 0.5), 0, Math.PI, 0);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
-    // Ground and the dirt lane
+    // Ground: the top (with depth), a dirt road, and the front edge
+    const x0 = camX - 2;
+    const x1 = camX + VIEW_W + 1;
+    const g = STAND.groundY;
     ctx.fillStyle = era.ground;
-    ctx.fillRect(0, gy - tile * 0.25, w, h - gy + tile * 0.25);
+    poly(ctx, [
+      [x0, g, 0],
+      [x1, g, 0],
+      [x1, g, STAND.depth + 1],
+      [x0, g, STAND.depth + 1],
+    ]);
+    ctx.fill();
     ctx.fillStyle = era.path;
-    ctx.fillRect(0, gy - tile * 0.15, w, tile * 0.55);
-    ctx.fillStyle = shade(era.path, -0.25);
-    ctx.fillRect(0, gy + tile * 0.4, w, tile * 0.08);
-    const rng = createRng(3);
-    for (let i = 0; i < 6; i++) {
-      emoji(
-        ctx,
-        era.decor[i % era.decor.length]!,
-        (3 + rng.next() * 6.6) * tile,
-        (11.4 + rng.next() * 1.2) * tile,
-        tile * 0.6,
-      );
+    poly(ctx, [
+      [x0, g, 0.1],
+      [x1, g, 0.1],
+      [x1, g, STAND.depth - 0.1],
+      [x0, g, STAND.depth - 0.1],
+    ]);
+    ctx.fill();
+    ctx.strokeStyle = shade(era.path, -0.2);
+    ctx.lineWidth = 2;
+    for (const z of [0.1, STAND.depth - 0.1]) {
+      ctx.beginPath();
+      ctx.moveTo(sx(x0, z), sy(g, z));
+      ctx.lineTo(sx(x1, z), sy(g, z));
+      ctx.stroke();
+    }
+    ctx.fillStyle = shade(era.ground, -0.22);
+    ctx.fillRect(0, sy(g), w, h - sy(g));
+    // Scenery along the back and the front, spread over the whole field
+    const rng = createRng(5);
+    for (let i = 0; i < 26; i++) {
+      const x = 3 + rng.next() * (STAND.fieldWidth - 2);
+      const front = i % 2 === 0;
+      const y = front ? g + 0.9 + rng.next() * 1.4 : g;
+      const z = front ? 0 : STAND.depth + 0.3 + rng.next() * 0.5;
+      if (sx(x, z) < -tile || sx(x, z) > w + tile) continue;
+      emoji(ctx, era.decor[i % era.decor.length]!, sx(x, z), sy(y, z) - tile * 0.25, tile * 0.65);
     }
   };
 
   const drawWall = (ctx: CanvasRenderingContext2D, era: Era) => {
-    const x0 = STAND.wallLeft * tile;
-    const x1 = STAND.wallX * tile;
-    const top = STAND.wallTop * tile;
-    const bottom = (STAND.groundY + 0.35) * tile;
-    const stone = era.id === 'future' ? '#5d6b8f' : era.id === 'modern' ? '#9aa0a8' : '#8f8a80';
-    ctx.fillStyle = 'rgba(0,0,0,.25)';
-    ctx.fillRect(x1, top + tile * 0.2, tile * 0.18, bottom - top - tile * 0.2);
-    ctx.fillStyle = stone;
-    ctx.fillRect(x0, top, x1 - x0, bottom - top);
-    // Bricks
-    ctx.strokeStyle = shade(stone, -0.25);
-    ctx.lineWidth = 1;
-    const bh = tile * 0.4;
-    for (let r = 0, y = top; y < bottom; r++, y += bh) {
-      ctx.beginPath();
-      ctx.moveTo(x0, y);
-      ctx.lineTo(x1, y);
-      ctx.stroke();
-      for (let x = x0 + (r % 2 ? tile * 0.35 : 0); x < x1; x += tile * 0.7) {
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, Math.min(bottom, y + bh));
-        ctx.stroke();
-      }
-    }
-    // Battlements
-    ctx.fillStyle = stone;
-    for (let x = x0; x < x1 - 1; x += tile * 0.6) {
-      ctx.fillRect(x, top - tile * 0.35, tile * 0.35, tile * 0.36);
-    }
+    const { back, front, top } = STAND.wall;
+    const g = STAND.groundY + 0.05;
+    const d = STAND.depth;
+    const style = era.wall;
+    const energy = style.kind === 'energy';
+    const glow = energy ? 0.35 + 0.15 * Math.sin(clock * 3) : 1;
+    ctx.globalAlpha = energy ? glow + 0.15 : 1;
+    // Side facing the enemies, the top walkway, then the front face.
+    ctx.fillStyle = shade(style.color, -0.2);
+    poly(ctx, [
+      [front, top, 0],
+      [front, top, d],
+      [front, g, d],
+      [front, g, 0],
+    ]);
+    ctx.fill();
+    ctx.fillStyle = shade(style.color, 0.15);
+    poly(ctx, [
+      [back, top, 0],
+      [front, top, 0],
+      [front, top, d],
+      [back, top, d],
+    ]);
+    ctx.fill();
+    ctx.fillStyle = style.color;
+    poly(ctx, [
+      [back, top, 0],
+      [front, top, 0],
+      [front, g, 0],
+      [back, g, 0],
+    ]);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    wallDetails(ctx, era);
+    // Edges
+    ctx.strokeStyle = energy ? '#c9f3ff' : shade(style.color, -0.4);
+    ctx.lineWidth = energy ? 2.5 : 1.5;
+    poly(ctx, [
+      [back, g, 0],
+      [back, top, 0],
+      [back, top, d],
+      [front, top, d],
+      [front, g, d],
+      [front, g, 0],
+    ]);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx(back, 0), sy(top, 0));
+    ctx.lineTo(sx(front, 0), sy(top, 0));
+    ctx.lineTo(sx(front, d), sy(top, d));
+    ctx.moveTo(sx(front, 0), sy(top, 0));
+    ctx.lineTo(sx(front, 0), sy(g, 0));
+    ctx.stroke();
     // Cracks as the wall gets hurt
     const frac = stand.wallHp / stand.wallMax;
-    ctx.strokeStyle = 'rgba(30,20,10,.7)';
+    ctx.strokeStyle = 'rgba(30,20,10,.75)';
     ctx.lineWidth = Math.max(1.5, tile * 0.05);
-    const crack = (cx: number, cy: number) => {
+    const crack = (x: number, y: number) => {
       ctx.beginPath();
-      ctx.moveTo(cx * tile, cy * tile);
-      ctx.lineTo((cx + 0.3) * tile, (cy + 0.5) * tile);
-      ctx.lineTo((cx + 0.1) * tile, (cy + 0.9) * tile);
-      ctx.lineTo((cx + 0.4) * tile, (cy + 1.4) * tile);
+      ctx.moveTo(sx(x), sy(y));
+      ctx.lineTo(sx(x + 0.3), sy(y + 0.5));
+      ctx.lineTo(sx(x + 0.1), sy(y + 0.9));
+      ctx.lineTo(sx(x + 0.4), sy(y + 1.4));
       ctx.stroke();
     };
-    if (frac < 0.75) crack(1.6, 8.1);
-    if (frac < 0.5) crack(0.7, 5.2);
-    if (frac < 0.25) crack(1.3, 3.6);
-    // The base peeks over the top
-    emoji(ctx, era.base, (x0 + x1) / 2, top - tile * 0.75, tile * 0.95);
+    if (frac < 0.75) crack(1.6, 8.3);
+    if (frac < 0.5) crack(0.7, 7.2);
+    if (frac < 0.25) crack(1.2, 6.9);
+    // Your base behind the wall
+    emoji(ctx, era.base, sx(back + 0.7, d + 0.4), sy(top - 0.55, d + 0.4), tile * 1.1);
   };
 
-  const drawSpots = (ctx: CanvasRenderingContext2D) => {
-    const cheapest = Math.min(
-      ...UNIT_IDS.filter((id) => st.isUnitUnlocked(stand, id)).map((id) => unitDef(id).cost),
-    );
-    STAND.slots.forEach((y, i) => {
-      // Wooden ledge sticking out of the wall
-      const lx = (STAND.unitX - 0.55) * tile;
-      ctx.fillStyle = '#6d4c2f';
-      ctx.fillRect(lx, y * tile, (STAND.wallX + 0.3 - STAND.unitX + 0.55) * tile, tile * 0.2);
-      ctx.fillStyle = '#b07f4a';
-      ctx.fillRect(
-        lx,
-        y * tile - tile * 0.06,
-        (STAND.wallX + 0.3 - STAND.unitX + 0.55) * tile,
-        tile * 0.1,
-      );
-      const p = st.unitPos(i);
-      const unit = stand.slots[i];
-      if (selected === i) {
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(p.x * tile, p.y * tile, tile * 0.5, 0, Math.PI * 2);
+  /** Era-specific texture on the front and side faces. */
+  const wallDetails = (ctx: CanvasRenderingContext2D, era: Era) => {
+    const { back, front, top } = STAND.wall;
+    const g = STAND.groundY;
+    const d = STAND.depth;
+    const { kind, color } = era.wall;
+    ctx.strokeStyle = shade(color, -0.35);
+    ctx.lineWidth = 1.2;
+    const line = (a: [number, number, number], b: [number, number, number]) => {
+      ctx.beginPath();
+      ctx.moveTo(sx(a[0], a[2]), sy(a[1], a[2]));
+      ctx.lineTo(sx(b[0], b[2]), sy(b[1], b[2]));
+      ctx.stroke();
+    };
+    if (kind === 'logs') {
+      // A palisade: upright logs with pointed tops
+      for (let x = back; x < front - 0.01; x += 0.36) line([x, top, 0], [x, g, 0]);
+      for (let z = 0; z < d; z += 0.36) line([front, top, z], [front, g, z]);
+      ctx.fillStyle = shade(color, -0.05);
+      for (let x = back; x < front - 0.01; x += 0.36) {
+        poly(ctx, [
+          [x, top, 0],
+          [x + 0.18, top - 0.35, 0],
+          [x + 0.36, top, 0],
+        ]);
+        ctx.fill();
         ctx.stroke();
       }
-      if (unit) {
-        const pulse = (firePulse.get(unit.id) ?? 0) / 0.16;
-        emoji(
-          ctx,
-          unitDef(unit.type).emoji,
-          p.x * tile,
-          p.y * tile - pulse * tile * 0.05,
-          tile * 0.75 * (1 + pulse * 0.15),
-        );
-        for (let l = 0; l <= unit.level; l++) {
-          ctx.fillStyle = '#ffd34d';
-          ctx.beginPath();
-          ctx.arc(
-            (p.x + (l - unit.level / 2) * 0.18) * tile,
-            (p.y + 0.42) * tile,
-            tile * 0.06,
-            0,
-            Math.PI * 2,
-          );
-          ctx.fill();
+      for (let z = 0.36; z < d; z += 0.36) {
+        poly(ctx, [
+          [front, top, z - 0.36],
+          [front, top - 0.35, z - 0.18],
+          [front, top, z],
+        ]);
+        ctx.fill();
+        ctx.stroke();
+      }
+    } else if (kind === 'blocks' || kind === 'bricks') {
+      const bw = kind === 'blocks' ? 0.7 : 0.4;
+      const bh = kind === 'blocks' ? 0.45 : 0.25;
+      for (let r = 0, y = top; y < g; r++, y += bh) {
+        line([back, y, 0], [front, y, 0]);
+        line([front, y, 0], [front, y, d]);
+        for (let x = back + (r % 2 ? bw / 2 : 0); x < front; x += bw) {
+          line([x, y, 0], [x, Math.min(g, y + bh), 0]);
         }
-      } else {
-        const ready = stand.chest >= cheapest && !stand.over;
-        ctx.globalAlpha = ready ? 0.55 + 0.35 * Math.sin(clock * 4 + i) : 0.35;
-        ctx.setLineDash([5, 4]);
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(p.x * tile, p.y * tile, tile * 0.36, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        text(ctx, '+', p.x * tile, p.y * tile, tile * 0.5, '#fff');
-        ctx.globalAlpha = 1;
+        for (let z = r % 2 ? bw / 2 : 0; z < d; z += bw) {
+          line([front, y, z], [front, Math.min(g, y + bh), z]);
+        }
       }
-    });
+      // Battlements along the front and the enemy side
+      ctx.fillStyle = shade(color, 0.05);
+      const merlon = (x: number, z: number, alongZ: boolean) => {
+        const w = 0.32;
+        const h = 0.35;
+        const pts: [number, number, number][] = alongZ
+          ? [
+              [x, top, z],
+              [x, top - h, z],
+              [x, top - h, z + w],
+              [x, top, z + w],
+            ]
+          : [
+              [x, top, z],
+              [x, top - h, z],
+              [x + w, top - h, z],
+              [x + w, top, z],
+            ];
+        poly(ctx, pts);
+        ctx.fill();
+        ctx.stroke();
+      };
+      for (let z = d - 0.32; z > 0; z -= 0.6) merlon(front, z, true);
+      for (let x = back; x < front - 0.2; x += 0.6) merlon(x, 0, false);
+    } else if (kind === 'concrete') {
+      for (let y = top + 0.8; y < g; y += 0.8) {
+        line([back, y, 0], [front, y, 0]);
+        line([front, y, 0], [front, y, d]);
+      }
+      // Hazard stripes along the top
+      for (let x = back; x < front; x += 0.3) {
+        ctx.fillStyle = Math.round((x - back) / 0.3) % 2 ? '#222' : '#ffd34d';
+        ctx.fillRect(sx(x), sy(top), 0.3 * tile, 0.18 * tile);
+      }
+    } else {
+      // Energy shield: glowing hex-ish lines that shimmer
+      ctx.strokeStyle = `rgba(200,245,255,${0.4 + 0.3 * Math.sin(clock * 4)})`;
+      for (let y = top + 0.4; y < g; y += 0.5) {
+        line([back, y, 0], [front, y, 0]);
+        line([front, y, 0], [front, y, d]);
+      }
+    }
+  };
+
+  const drawDefenders = (ctx: CanvasRenderingContext2D) => {
+    const order = [...stand.defenders].sort((a, b) => st.seatPos(b.seat).z - st.seatPos(a.seat).z);
+    for (const u of order) {
+      const p = st.seatPos(u.seat);
+      const pulse = (firePulse.get(u.id) ?? 0) / 0.16;
+      const x = sx(p.x, p.z);
+      const y = sy(p.y, p.z);
+      ctx.fillStyle = 'rgba(0,0,0,.2)';
+      ctx.beginPath();
+      ctx.ellipse(x, sy(STAND.wall.top, p.z), tile * 0.28, tile * 0.09, 0, 0, Math.PI * 2);
+      ctx.fill();
+      emoji(
+        ctx,
+        unitDef(u.type).emoji,
+        x,
+        y - pulse * tile * 0.06,
+        tile * 0.6 * (1 + pulse * 0.15),
+      );
+    }
   };
 
   const drawEnemies = (ctx: CanvasRenderingContext2D) => {
-    for (const e of [...stand.enemies].sort((a, b) => b.x - a.x)) {
+    const w = VIEW_W * tile;
+    for (const e of [...stand.enemies].sort((a, b) => b.z - a.z)) {
+      const ex = sx(e.x, e.z);
+      if (ex < -tile * 2 || ex > w + tile * 2) continue;
       const def = enemyDef(e.type);
       const size = tile * 0.7 * (e.boss ? GAME.boss.size : 1);
-      const atWall = e.x <= STAND.wallX + 0.31 * (e.boss ? GAME.boss.size : 1);
+      const atWall = e.x <= st.wallStop(e) + 0.01;
       const step = clock * 9 * (e.speed / 1.2) + e.id;
-      const ex = e.x * tile;
-      const ey = st.enemyY(e) * tile - (atWall ? 0 : Math.abs(Math.sin(step)) * tile * 0.1);
-      // Leaning into the wall right after a hit
-      const lean = atWall ? -0.35 * Math.max(0, e.hitTimer / STAND.attackEvery - 0.6) * 2.5 : 0;
+      const ey = sy(st.enemyY(e), e.z) - (atWall ? 0 : Math.abs(Math.sin(step)) * tile * 0.1);
+      const lean = atWall ? -0.35 * Math.max(0, (e.hitTimer / STAND.attackEvery - 0.6) * 2.5) : 0;
       ctx.fillStyle = 'rgba(0,0,0,.2)';
       ctx.beginPath();
-      ctx.ellipse(ex, (STAND.groundY + 0.05) * tile, size * 0.4, size * 0.1, 0, 0, Math.PI * 2);
+      ctx.ellipse(ex, sy(STAND.groundY, e.z), size * 0.4, size * 0.1, 0, 0, Math.PI * 2);
       ctx.fill();
       if (hitFlash.has(e.id)) {
         ctx.fillStyle = 'rgba(255,255,255,.7)';
@@ -471,6 +568,42 @@ export function createLastStandScene(game: Game): Scene {
     }
   };
 
+  /** The whole field squeezed into a strip: wall, enemies and what you're looking at. */
+  const drawMiniMap = (ctx: CanvasRenderingContext2D) => {
+    const k = MINI.w / STAND.fieldWidth;
+    const X = (x: number) => (MINI.x + x * k) * tile;
+    ctx.fillStyle = 'rgba(10,20,30,.55)';
+    ctx.fillRect(MINI.x * tile, MINI.y * tile, MINI.w * tile, MINI.h * tile);
+    ctx.fillStyle = '#c9b38a';
+    ctx.fillRect(
+      X(STAND.wall.back),
+      MINI.y * tile,
+      (STAND.wall.front - STAND.wall.back) * k * tile,
+      MINI.h * tile,
+    );
+    ctx.fillStyle = '#ff5d5d';
+    for (const e of stand.enemies) {
+      ctx.beginPath();
+      ctx.arc(X(e.x), (MINI.y + MINI.h / 2) * tile, tile * (e.boss ? 0.12 : 0.07), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(X(camX), MINI.y * tile, VIEW_W * k * tile, MINI.h * tile);
+  };
+
+  /** Arrows at the screen edges: how many are coming from the right, and the way back to the wall. */
+  const drawEdgeMarkers = (ctx: CanvasRenderingContext2D) => {
+    const w = VIEW_W * tile;
+    const y = tile * 1.35;
+    const ahead = stand.enemies.filter((e) => e.x > camX + VIEW_W + 0.3).length;
+    if (ahead) {
+      const bob = Math.sin(clock * 6) * tile * 0.08;
+      text(ctx, `${ahead} coming 👉`, w - tile * 1.6 + bob, y, tile * 0.4, '#fff');
+    }
+    if (camX > 1) text(ctx, '👈 🏰', tile * 0.9, y, tile * 0.4, '#fff');
+  };
+
   // ---------- Scene ----------
   return {
     enter(params) {
@@ -483,44 +616,56 @@ export function createLastStandScene(game: Game): Scene {
         damageBonus: 1 + opts.bonusDamage,
       });
       if (new URLSearchParams(location.search).has('dev')) stand.chest = 99_999;
+      camX = 0;
+      drag = null;
       speed = 1;
       paused = false;
-      selected = null;
       popups = [];
       rings = [];
       shake = 0;
       fallTimer = -1;
       clock = 0;
+      repairWasPossible = false;
       lastHp.clear();
       hitFlash.clear();
       lastCooldown.clear();
       firePulse.clear();
-      banner = { text: '🏰 Last Stand! Put defenders on the wall', t: -2 };
+      banner = { text: '🏰 Last Stand! Buy defenders, drag 👉 to look', t: -3 };
       buildUi();
       $('hud').hidden = false;
       $('panel').hidden = false;
-      renderContext();
+      renderShop();
       this.onResize!();
       document.addEventListener('visibilitychange', onVisibility);
+      game.canvas.addEventListener('wheel', onWheel, { passive: false });
     },
     exit() {
       document.removeEventListener('visibilitychange', onVisibility);
+      game.canvas.removeEventListener('wheel', onWheel);
     },
     onResize() {
-      tile = fitCanvas(game.canvas, W, H);
+      tile = fitCanvas(game.canvas, VIEW_W, VIEW_H);
     },
-    onTap(px, py, pointerType) {
-      if (stand.over) return;
+    onTap(px, py) {
       const x = px / tile;
       const y = py / tile;
-      const reach = pointerType === 'mouse' ? 0.55 : 0.75;
-      let hit: number | null = null;
-      STAND.slots.forEach((_, i) => {
-        const p = st.unitPos(i);
-        if (Math.hypot(p.x - x, p.y - y) <= reach) hit = i;
-      });
-      selected = hit === selected ? null : hit;
-      renderContext();
+      // Tap the mini-map to jump there
+      if (y <= MINI.y + MINI.h + 0.25 && x >= MINI.x && x <= MINI.x + MINI.w) {
+        setCam(((x - MINI.x) / MINI.w) * STAND.fieldWidth - VIEW_W / 2);
+        return;
+      }
+      drag = { px, camX, moved: false };
+    },
+    onPointerMove(px) {
+      if (!drag) return;
+      if (Math.abs(px - drag.px) > 4) drag.moved = true;
+      setCam(drag.camX - (px - drag.px) / tile);
+    },
+    onPointerUp(px, py) {
+      const d = drag;
+      drag = null;
+      // A plain tap on the "back to the wall" marker
+      if (d && !d.moved && camX > 1 && px < tile * 1.8 && py < tile * 1.9) camX = 0;
     },
     update(dt) {
       if (fallTimer >= 0) {
@@ -540,38 +685,33 @@ export function createLastStandScene(game: Game): Scene {
       animate(fx);
       popups = popups.filter((p) => (p.t += fx) < 1);
       rings = rings.filter((r) => (r.t += fx) < 0.3);
-      if (banner && (banner.t += dt) > 1.8) banner = null;
+      if (banner && (banner.t += dt) > 2) banner = null;
       shake = Math.max(0, shake - dt * 2);
       updateUi();
     },
     draw() {
       const ctx = game.ctx;
       const era = ERAS[stand.era]!;
-      const w = W * tile;
-      const h = H * tile;
+      const w = VIEW_W * tile;
+      const h = VIEW_H * tile;
       ctx.save();
       if (shake > 0) {
         const s = shake * tile * 0.15;
         ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
       }
-      drawScene(ctx, era);
+      drawBackdrop(ctx, era);
       drawWall(ctx, era);
-      // Range of the selected defender along the ground
-      const sel = selected !== null ? stand.slots[selected] : null;
-      if (sel) {
-        const range = unitDef(sel.type).levels[sel.level]!.range;
-        ctx.fillStyle = 'rgba(255,255,255,.18)';
-        ctx.fillRect(STAND.wallX * tile, (STAND.groundY - 0.9) * tile, range * tile, tile * 1.3);
-      }
-      drawSpots(ctx);
+      drawDefenders(ctx);
       drawEnemies(ctx);
       for (const s of stand.shots) {
         const shot = unitDef(s.unit).shot;
-        if (shot.emoji) emoji(ctx, shot.emoji, s.x * tile, s.y * tile, tile * shot.size);
+        const x = sx(s.x, s.z);
+        const y = sy(s.y, s.z);
+        if (shot.emoji) emoji(ctx, shot.emoji, x, y, tile * shot.size);
         else {
           ctx.fillStyle = shot.color ?? '#fff';
           ctx.beginPath();
-          ctx.arc(s.x * tile, s.y * tile, tile * shot.size * 0.6, 0, Math.PI * 2);
+          ctx.arc(x, y, tile * shot.size * 0.6, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -579,25 +719,25 @@ export function createLastStandScene(game: Game): Scene {
         ctx.strokeStyle = `rgba(255,190,80,${1 - r.t / 0.3})`;
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(r.x * tile, r.y * tile, r.r * tile * (0.4 + r.t * 2), 0, Math.PI * 2);
+        const rad = r.r * tile * (0.4 + r.t * 2);
+        ctx.ellipse(sx(r.x, r.z), sy(r.y, r.z), rad, rad * 0.4, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
       for (const p of popups) {
         ctx.globalAlpha = 1 - p.t;
-        text(ctx, p.text, p.x * tile, (p.y - p.t * 0.6) * tile, tile * p.size, p.color);
+        text(ctx, p.text, sx(p.x, p.z), sy(p.y - p.t * 0.6, p.z), tile * p.size, p.color);
       }
       ctx.globalAlpha = 1;
       ctx.restore();
 
+      drawMiniMap(ctx);
+      drawEdgeMarkers(ctx);
       if (banner && banner.t >= 0) {
-        ctx.globalAlpha = Math.max(0, Math.min(1, banner.t * 4, (1.8 - banner.t) * 3));
-        text(ctx, banner.text, w / 2 + tile, h * 0.2, tile * 0.5, '#fff');
+        ctx.globalAlpha = Math.max(0, Math.min(1, banner.t * 4, (2 - banner.t) * 3));
+        text(ctx, banner.text, w / 2, h * 0.22, tile * 0.42, '#fff');
         ctx.globalAlpha = 1;
       } else if (banner) {
-        text(ctx, banner.text, w / 2 + tile, h * 0.2, tile * 0.38, '#fff');
-      }
-      if (!stand.queue.length && !stand.enemies.length && !stand.over && stand.nextWaveIn > 0) {
-        text(ctx, `${Math.ceil(stand.nextWaveIn)}`, w / 2 + tile, h * 0.28, tile * 0.9, '#ffd34d');
+        text(ctx, banner.text, w / 2, h * 0.22, tile * 0.38, '#fff');
       }
       if (paused && fallTimer < 0) text(ctx, '⏸ Paused', w / 2, h / 2, tile * 0.7, '#fff');
       if (fallTimer >= 0) {
@@ -618,5 +758,3 @@ export function createLastStandScene(game: Game): Scene {
     },
   };
 }
-
-const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));

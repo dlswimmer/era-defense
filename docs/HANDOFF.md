@@ -25,9 +25,11 @@ Why things are the way they are. Keep this current when a decision changes.
   previous wave finishes spawning; tapping ⏩ calls it early for bonus gold.
 - **Relics** = wave reached + 2 per boss stopped (`relicsEarned`).
 - **Phase 2 is a side view** (David's call), to feel different from the top-down Phase 1.
-  v1 is flat 2D side-on (`src/scenes/lastStand.ts`); depth/2.5D can come with the graphics pass.
-  Defenders go on 4 fixed spots on the wall (tap a spot, then a defender, or just tap a
-  defender to fill the next spot) because a tall wall fits a portrait phone well.
+  It's drawn 2.5D with a simple oblique projection (`STAND.skew`): x along the field, y height,
+  z depth, screen = (x + z·skew, y − z·skew). The sim tracks z so enemies spread across the road.
+- **Last Stand v2 (David, Nov 13):** no fixed spots; bought defenders fill the wall by
+  themselves, no per-defender upgrades, team boosts instead. Enemies start ~2 screens away so
+  there's time to get ready, and the field can be dragged to see what's coming.
 - **Phase 1 Relics are saved when Phase 1 ends**, and the Last Stand adds its own when the wall
   falls, so closing the app mid-Last-Stand never loses Phase 1 progress.
 - **The Last Stand replays the wave that broke through** and always gives at least
