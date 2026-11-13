@@ -24,8 +24,14 @@ Why things are the way they are. Keep this current when a decision changes.
   checks the first run pays enough Relics to evolve. Waves come on their own 5 s after the
   previous wave finishes spawning; tapping ⏩ calls it early for bonus gold.
 - **Relics** = wave reached + 2 per boss stopped (`relicsEarned`).
-- **Phase 2 will be a side-on 2.5D view** (David's call), to feel different from the top-down
-  Phase 1. The results screen shows a "coming soon" teaser in its place.
+- **Phase 2 is a side view** (David's call), to feel different from the top-down Phase 1.
+  v1 is flat 2D side-on (`src/scenes/lastStand.ts`); depth/2.5D can come with the graphics pass.
+  Defenders go on 4 fixed spots on the wall (tap a spot, then a defender, or just tap a
+  defender to fill the next spot) because a tall wall fits a portrait phone well.
+- **Phase 1 Relics are saved when Phase 1 ends**, and the Last Stand adds its own when the wall
+  falls, so closing the app mid-Last-Stand never loses Phase 1 progress.
+- **The Last Stand replays the wave that broke through** and always gives at least
+  `STAND.minChest` War Chest, so even a rough Phase 1 gets one defender.
 - **Breach = the first enemy that reaches the base** (David, Nov 13). No wall HP in Phase 1;
   `era.wallHp` is kept for the Last Stand. Thick Walls became Strong Arms (save v3 migrates
   the levels). The balance test now checks every era is a short run (1-5 minutes).
