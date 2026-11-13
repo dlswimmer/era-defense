@@ -18,7 +18,7 @@ import { saveMeta } from '../save';
 import { ERAS, type Era } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
 import { GAME } from '../sim/data/game';
-import { runOptions } from '../sim/data/metaUpgrades';
+import { runOptions } from '../sim/web';
 import { BOOSTS, STAND, type Boost } from '../sim/data/stand';
 import { UNIT_IDS, unitDef, type UnitId } from '../sim/data/units';
 import { createRng } from '../sim/rng';
@@ -268,19 +268,19 @@ export function createLastStandScene(game: Game): Scene {
 
   const finish = () => {
     const { meta } = game;
-    const relics = st.standRelics(stand);
-    meta.relics += relics; // Phase 1 Relics were already saved when it ended
+    const coins = st.standCoins(stand);
+    meta.coins += coins; // Phase 1 coins were already saved when it ended
     saveMeta(meta);
     const summary: RunSummary = {
       ...phase1,
       chest: stand.chest,
-      relics: phase1.relics + relics,
+      coins: phase1.coins + coins,
       stand: {
         held: st.standWavesHeld(stand),
         wave: stand.wave,
         kills: stand.kills,
         time: stand.time,
-        relics,
+        coins,
       },
     };
     game.go('breach', summary);
@@ -674,13 +674,18 @@ export function createLastStandScene(game: Game): Scene {
   return {
     enter(params) {
       phase1 = params as RunSummary;
-      const opts = runOptions(game.meta.upgrades);
+      const opts = runOptions(game.meta.web);
       stand = st.createStand(Date.now(), {
         era: phase1.era,
         wave: phase1.wave,
         chest: phase1.chest,
         damageBonus: 1 + opts.bonusDamage,
+        units: opts.units,
+        unitMods: opts.unitMods,
+        wallBonus: opts.wallBonus,
+        coinBonus: opts.coinBonus,
       });
+      st.hireMasteryBuddies(stand);
       if (new URLSearchParams(location.search).has('dev')) stand.chest = 99_999;
       camX = 0;
       drag = null;

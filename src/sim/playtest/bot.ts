@@ -1,8 +1,20 @@
 // A simple bot that plays Phase 1, used by tests and `npm run balance` to check pacing.
 import { towerDef, TOWER_IDS, type TowerId } from '../data/towers';
-import { relicsEarned, type RunOptions } from '../data/metaUpgrades';
 import { posAt, type Point } from '../path';
 import * as sim from '../run';
+import { ERAS } from '../data/eras';
+import {
+  WEB_NODES,
+  buyNode,
+  currentEra,
+  eraNodeId,
+  gateNodes,
+  nodeState,
+  ownedSet,
+  runOptions,
+  webNode,
+  type RunOptions,
+} from '../web';
 import { UNIT_IDS, unitDef } from '../data/units';
 import { BOOSTS, type Boost } from '../data/stand';
 import {
@@ -11,7 +23,8 @@ import {
   canHire,
   createStand,
   hire,
-  standRelics,
+  hireMasteryBuddies,
+  standCoins,
   standWavesHeld,
   stepStand,
   type Stand,
@@ -22,7 +35,7 @@ export interface BotResult {
   wave: number;
   held: number;
   time: number;
-  relics: number;
+  coins: number;
   era: number;
   chest: number;
   kills: number;
@@ -118,7 +131,7 @@ export function playRun(
     kills: run.kills,
     towers: run.towers.length,
     time: run.time,
-    relics: relicsEarned(run),
+    coins: sim.runCoins(run),
   };
 }
 
@@ -143,12 +156,13 @@ export interface StandResult {
   time: number;
   held: number;
   wave: number;
-  relics: number;
+  coins: number;
 }
 
 /** Plays a Last Stand until the wall falls (or a time limit, in seconds of game time). */
 export function playStand(seed: number, opts: StandOptions, maxTime = 1800): StandResult {
   const stand = createStand(seed, opts);
+  hireMasteryBuddies(stand);
   spendStand(stand);
   let since = 0;
   while (!stand.over && stand.time < maxTime) {
@@ -164,6 +178,72 @@ export function playStand(seed: number, opts: StandOptions, maxTime = 1800): Sta
     time: stand.time,
     held: standWavesHeld(stand),
     wave: stand.wave,
-    relics: standRelics(stand),
+    coins: standCoins(stand),
   };
+}
+
+// ---------- Whole campaigns (the upgrade web) ----------
+
+export interface EraPace {
+  era: number;
+  runs: number;
+  /** Minutes of play (both phases), not counting menus. */
+  minutes: number;
+}
+
+/**
+ * Plays run after run, spending coins in the upgrade web between runs the way a focused player
+ * would: the cheapest node that counts toward the Evolve gate first, then save up for Evolve.
+ * Returns how many runs (and minutes) each era took. Real kids buy fun stuff on the way, so
+ * they will be a bit slower than this. Stops once it has Evolved past `lastEra`, or (in the last
+ * era) once every node is bought.
+ */
+export function playCampaign(seed: number, lastEra = ERAS.length - 1, maxRuns = 3000): EraPace[] {
+  const buyable = WEB_NODES.filter((n) => !n.empty).length;
+  const bought: string[] = [];
+  let coins = 0;
+  const pace: EraPace[] = [{ era: 0, runs: 0, minutes: 0 }];
+  for (let i = 0; i < maxRuns; i++) {
+    const opts = runOptions(bought);
+    if (opts.era > lastEra || ownedSet(bought).size >= buyable) break;
+    const r = playRun(seed + i, opts);
+    const s = playStand(seed + i, {
+      era: opts.era,
+      wave: r.wave,
+      chest: r.chest,
+      damageBonus: 1 + opts.bonusDamage,
+      units: opts.units,
+      unitMods: opts.unitMods,
+      wallBonus: opts.wallBonus,
+      coinBonus: opts.coinBonus,
+    });
+    coins += r.coins + s.coins;
+    const now = pace[pace.length - 1]!;
+    now.runs++;
+    now.minutes += (r.time + s.time) / 60;
+    coins = shopWeb(bought, coins);
+    const era = currentEra(ownedSet(bought));
+    if (era > now.era) pace.push({ era, runs: 0, minutes: 0 });
+  }
+  return pace.filter((p) => p.runs > 0 && p.era <= lastEra);
+}
+
+/** Spends coins in the web: gate nodes first (cheapest first), then saves for Evolve. */
+export function shopWeb(bought: string[], coins: number): number {
+  for (let guard = 0; guard < 200; guard++) {
+    const owned = ownedSet(bought);
+    const era = currentEra(owned);
+    const next = era + 1 < ERAS.length ? webNode(eraNodeId(era + 1)) : undefined;
+    if (next && nodeState(next, owned, coins) === 'open') {
+      coins = buyNode(bought, coins, next.id)!;
+      continue;
+    }
+    const pool = gateNodes(era).filter((n) => !owned.has(n.id));
+    const choices = (pool.length || !next ? (pool.length ? pool : WEB_NODES) : [])
+      .filter((n) => nodeState(n, owned, coins) === 'open')
+      .sort((a, b) => a.cost - b.cost);
+    if (!choices.length) return coins;
+    coins = buyNode(bought, coins, choices[0]!.id)!;
+  }
+  return coins;
 }

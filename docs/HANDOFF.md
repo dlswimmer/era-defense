@@ -16,21 +16,39 @@ Why things are the way they are. Keep this current when a decision changes.
 - **Sim is pure.** `src/sim/` has no DOM. The scene (`src/scenes/outerDefense.ts`) calls
   `step()` and turns `run.events` into popups, beams and screen shake. This lets the bot in
   `src/sim/playtest/bot.ts` play whole runs in tests.
-- **Evolve is a Relic upgrade, not an in-run purchase** (David, Nov 2026). Each run starts in
-  the highest era you have unlocked, with that era's gold and wall. Later eras skip ahead to one
+- **Evolve lives in the upgrade web, not in a run** (David, Nov 2026). Each run starts in
+  the newest era you have reached, with that era's gold and wall. Later eras skip ahead to one
   enemy tier below the era (`firstWave` in `createRun`) so runs don't open with a slog.
 - **The first run is short on purpose** (about 1.5 minutes): fast early runs get kids to new
-  towers and updates quickly. `balance.test.ts` locks Stone Age at 50-150 s of game time and
-  checks the first run pays enough Relics to evolve. Waves come on their own 5 s after the
+  towers and updates quickly. `balance.test.ts` locks Stone Age at 50-150 s of game time. Waves come on their own 5 s after the
   previous wave finishes spawning; tapping ⏩ calls it early for bonus gold.
-- **Relics** = wave reached + 2 per boss stopped (`relicsEarned`).
+- **Upgrade web** (David, Nov 13, like node-wars): Home in the middle, eras in a ring around it
+  (Stone Age at the top, clockwise), each era a slice: towers fan left, defenders right, Camp
+  upgrades down the middle, and every tower and defender has a line of 8 upgrades outward. The
+  nodes are built from the eras/towers/units data (`src/sim/web.ts`), so a new tower appears in
+  the web by itself; empty slots (up to 4 per era) show as "?" until the kids pick one and don't
+  count toward the gate. Only bought ids are saved (`meta.web`); free nodes (an era's first
+  tower and defender) come with their parent.
+- **Evolve gate:** to buy the next era, every tower and defender of your era must be unlocked
+  with its first 2-4 upgrades (`WEB.gateUpgrades`). That pushes kids to use everything first.
+- **Pacing** (David: "think Bloons, dozens of hours", early eras quick, later ones slower):
+  `WEB.price` grows faster per era than `WEB.reward`. Campaign bot (Nov 13): Stone Age ~14
+  runs, Ancient ~27, Medieval ~42, Gunpowder ~50, Modern ~71: about 15 hours to reach the
+  Future and 35 to buy everything (a focused bot; real kids will be slower). When the kids fill
+  the empty slots the gate grows, so re-check with `npm run balance -- campaign`.
+- **Coins, not Relics** (David): copper, silver, gold, platinum, each 100× the one before.
+  Stored as one number of copper; shown as the two biggest tiers. Rewards are ×10 per era, so
+  later eras pay in shinier coins. Coins per run = (wave reached + 2 per boss) in each phase ×
+  the era's reward scale × Lucky Find.
+- **Save v4** turned Relics into copper, kept reached eras, and refunded Treasure/Strong Arms
+  levels as coins to spend in the web.
 - **Phase 2 is a side view** (David's call), to feel different from the top-down Phase 1.
   It's drawn 2.5D with a simple oblique projection (`STAND.skew`): x along the field, y height,
   z depth, screen = (x + z·skew, y − z·skew). The sim tracks z so enemies spread across the road.
 - **Last Stand v2 (David, Nov 13):** no fixed spots; bought defenders fill the wall by
   themselves, no per-defender upgrades, team boosts instead. Enemies start ~2 screens away so
   there's time to get ready, and the field can be dragged to see what's coming.
-- **Phase 1 Relics are saved when Phase 1 ends**, and the Last Stand adds its own when the wall
+- **Phase 1 coins are saved when Phase 1 ends**, and the Last Stand adds its own when the wall
   falls, so closing the app mid-Last-Stand never loses Phase 1 progress.
 - **The Last Stand replays the wave that broke through** and always gives at least
   `STAND.minChest` War Chest, so even a rough Phase 1 gets one defender.

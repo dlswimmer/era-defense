@@ -121,3 +121,25 @@ describe('the wall', () => {
     expect(a.kills).toBe(b.kills);
   });
 });
+
+describe('upgrade web in the Last Stand', () => {
+  it('defender upgrades, Thick Wall and Mastery buddies', () => {
+    const plain = st.createStand(1, { era: 0, wave: 5, chest: 0 });
+    const s = st.createStand(1, {
+      era: 0,
+      wave: 5,
+      chest: 0,
+      units: ['spear'],
+      unitMods: { spear: { dmg: 1.5, rate: 1.2, range: 1.1, mastery: true } },
+      wallBonus: 0.2,
+    });
+    expect(s.wallMax).toBe(Math.round(plain.wallMax * 1.2));
+    expect(st.defenderStats(s, 'spear').dmg).toBeCloseTo(
+      st.defenderStats(plain, 'spear').dmg * 1.5,
+    );
+    expect(st.isUnitUnlocked(s, 'boomerang')).toBe(false);
+    st.hireMasteryBuddies(s);
+    expect(s.defenders).toHaveLength(1);
+    expect(s.chest).toBe(STAND.minChest); // the buddy was free
+  });
+});

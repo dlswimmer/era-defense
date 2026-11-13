@@ -4,7 +4,7 @@ import { ERAS } from './data/eras';
 import { enemyDef, type EnemyId } from './data/enemies';
 import { GAME } from './data/game';
 import { MAPS } from './data/maps';
-import type { RunOptions } from './data/metaUpgrades';
+import { NO_MODS, coinsFor, type Mods, type RunOptions } from './web';
 import { towerDef, upgradeCost, sellValue, type TowerId } from './data/towers';
 import { buildWave, hpScale, rankFor, WAVES, type Spawn } from './data/waves';
 import { distToTrail, posAt, prepareMap, type Point, type PreparedMap } from './path';
@@ -76,7 +76,12 @@ export interface Run {
   enemies: Enemy[];
   towers: Tower[];
   shots: Shot[];
-  damageBonus: number; // multiplies all tower damage (Relic upgrades)
+  damageBonus: number; // multiplies all tower damage (Camp upgrades)
+  /** Towers you can build this run (from the upgrade web), or null for every one up to your era. */
+  allowed: TowerId[] | null;
+  /** Per-tower boosts from the upgrade web. */
+  towerMods: Partial<Record<TowerId, Mods>>;
+  coinBonus: number; // + share of coins (Lucky Find)
   kills: number;
   bosses: number;
   time: number;
@@ -85,7 +90,13 @@ export interface Run {
   events: SimEvent[];
 }
 
-const DEFAULT_OPTIONS: RunOptions = { era: 0, bonusGold: 0, bonusDamage: 0 };
+const DEFAULT_OPTIONS: RunOptions = {
+  era: 0,
+  bonusGold: 0,
+  bonusDamage: 0,
+  wallBonus: 0,
+  coinBonus: 0,
+};
 
 export function createRun(
   seed = Date.now(),
@@ -113,6 +124,9 @@ export function createRun(
     towers: [],
     shots: [],
     damageBonus: 1 + opts.bonusDamage,
+    allowed: opts.towers ?? null,
+    towerMods: opts.towerMods ?? {},
+    coinBonus: opts.coinBonus,
     kills: 0,
     bosses: 0,
     time: 0,
@@ -149,7 +163,22 @@ export function isBuildable(run: Run, x: number, y: number): boolean {
   return !run.towers.some((t) => Math.hypot(t.x - x, t.y - y) < r * 2);
 }
 
-export const isUnlocked = (run: Run, type: TowerId) => towerDef(type).era <= run.era;
+export const isUnlocked = (run: Run, type: TowerId) =>
+  run.allowed ? run.allowed.includes(type) : towerDef(type).era <= run.era;
+
+/** A tower's stats at a level (0-based), with its upgrade-web boosts and Strong Arms. */
+export function towerStats(run: Run, type: TowerId, level: number) {
+  const base = towerDef(type).levels[level]!;
+  const m = run.towerMods[type] ?? NO_MODS;
+  return {
+    dmg: base.dmg * m.dmg * run.damageBonus,
+    range: base.range * m.range,
+    rate: base.rate * m.rate,
+  };
+}
+
+/** The level (0-based) a new tower starts at: Mastery skips the first one. */
+export const startLevel = (run: Run, type: TowerId) => (run.towerMods[type]?.mastery ? 1 : 0);
 
 export function canBuild(run: Run, type: TowerId, x: number, y: number): boolean {
   return (
@@ -169,7 +198,7 @@ export function build(run: Run, type: TowerId, x: number, y: number): Tower | nu
     type,
     x,
     y,
-    level: 0,
+    level: startLevel(run, type),
     spent: cost,
     cooldown: 0,
     targeting: 'first',
@@ -232,6 +261,9 @@ export function startWave(run: Run): boolean {
 }
 
 /** Waves the player held off this run. */
+/** Coins for Phase 1: 1 per wave reached and 2 per boss stopped, scaled by the era. */
+export const runCoins = (run: Run) => coinsFor(run.wave + 2 * run.bosses, run.era, run.coinBonus);
+
 export const wavesHeld = (run: Run) =>
   Math.max(0, run.wave - run.firstWave - (run.breached ? 1 : 0));
 
@@ -320,9 +352,9 @@ function fireTowers(run: Run, dt: number) {
     t.cooldown -= dt;
     if (t.cooldown > 0) continue;
     const def = towerDef(t.type);
-    const stats = def.levels[t.level]!;
+    const stats = towerStats(run, t.type, t.level);
     const { x, y } = t;
-    const dmg = stats.dmg * run.damageBonus;
+    const dmg = stats.dmg;
     const target = findTarget(run, x, y, stats.range, t.targeting);
     if (!target) {
       t.cooldown = 0;
