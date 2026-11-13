@@ -1,4 +1,6 @@
 // Phase 1: Outer Defense. Draws the run and turns taps into sim actions (src/sim/run.ts).
+import { TOWER_LOOKS, drawEnemyArt, drawThrown, enemyArtHeight, hasEnemyArt } from '../art/cast';
+import { Puffs, RELEASE as RELEASE_AT, drawPerson, drawShadow } from '../art/sprites';
 import type { Game, RunSummary, Scene } from '../game';
 import { emoji, fitCanvas, hpBar, drawMap, text } from '../render';
 import { saveMeta } from '../save';
@@ -34,6 +36,11 @@ interface Ring {
 }
 
 const BREACH_TIME = 2.6;
+/** Drawn people and monsters, in tiles tall. */
+const PERSON_SIZE = 1.15;
+const ENEMY_SIZE = 0.85;
+/** How long a thrower's follow-through lasts, in seconds. */
+const FOLLOW_THROUGH = 0.25;
 /** On touch screens the tower being placed floats this far (in tiles) above the finger. */
 const TOUCH_LIFT = 1.1;
 /** How close (in tiles of trail) an enemy gets to the base before the danger warning shows. */
@@ -67,6 +74,10 @@ export function createOuterDefenseScene(game: Game): Scene {
   const hitFlash = new Map<number, number>(); // enemy id -> seconds of white flash left
   const lastCooldown = new Map<number, number>();
   const firePulse = new Map<number, number>(); // tower id -> seconds of "throw" bounce left
+  const lastFire = new Map<number, number>(); // tower id -> clock when it last threw
+  const facing = new Map<number, number>(); // tower or enemy id -> 1 (right) or -1 (left)
+  const shotStart = new WeakMap<sim.Shot, Point>(); // where each shot left from
+  const puffs = new Puffs();
 
   // ---------- HUD ----------
   const hud = {
@@ -333,7 +344,10 @@ export function createOuterDefenseScene(game: Game): Scene {
     }
     for (const id of lastHp.keys()) if (!alive.has(id)) lastHp.delete(id);
     for (const t of run.towers) {
-      if (t.cooldown > (lastCooldown.get(t.id) ?? 0) + 0.01) firePulse.set(t.id, 0.16);
+      if (t.cooldown > (lastCooldown.get(t.id) ?? 0) + 0.01) {
+        firePulse.set(t.id, 0.16);
+        lastFire.set(t.id, clock);
+      }
       lastCooldown.set(t.id, t.cooldown);
     }
   };
@@ -387,6 +401,99 @@ export function createOuterDefenseScene(game: Game): Scene {
     ctx.fillRect(0, 0, w, h);
   };
 
+  /** Throw progress for a tower's person: wind up just before a shot, follow through after. */
+  const throwPose = (t: sim.Tower) => {
+    const stats = towerDef(t.type).levels[t.level]!;
+    const target = sim.findTarget(run, t.x, t.y, stats.range, t.targeting);
+    if (target) facing.set(t.id, target.x >= t.x ? 1 : -1);
+    const since = clock - (lastFire.get(t.id) ?? -99);
+    if (since < FOLLOW_THROUGH) return RELEASE_AT + (1 - RELEASE_AT) * (since / FOLLOW_THROUGH);
+    const windup = Math.min(0.3, 0.7 / stats.rate);
+    if (target && t.cooldown < windup) return RELEASE_AT * (1 - t.cooldown / windup);
+    return -1;
+  };
+
+  const drawTower = (ctx: CanvasRenderingContext2D, t: sim.Tower) => {
+    const cx = t.x * tile;
+    const cy = t.y * tile;
+    const r = GAME.towerRadius * tile;
+    // A wooden platform with a blue rim, so your towers never look like scenery.
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r * 0.62, r * 0.98, r * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#6d4c2f';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r * 0.48, r * 0.9, r * 0.44, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#b07f4a';
+    ctx.strokeStyle = t === selected ? '#fff' : '#4fb3ff';
+    ctx.lineWidth = t === selected ? 3 : 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r * 0.32, r * 0.9, r * 0.44, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    const look = TOWER_LOOKS[t.type];
+    if (look) {
+      ctx.save();
+      ctx.translate(cx, cy + r * 0.32);
+      ctx.scale(facing.get(t.id) ?? 1, 1);
+      drawPerson(ctx, tile * PERSON_SIZE, look, { throw: throwPose(t), t: clock + t.id });
+      ctx.restore();
+    } else {
+      const pulse = (firePulse.get(t.id) ?? 0) / 0.16; // 1 right after a shot
+      const size = tile * 0.7 * (1 + pulse * 0.18);
+      emoji(ctx, towerDef(t.type).emoji, cx, cy - r * 0.15 - pulse * tile * 0.06, size);
+    }
+    for (let i = 0; i <= t.level; i++) {
+      ctx.fillStyle = '#ffd34d';
+      ctx.strokeStyle = 'rgba(0,0,0,.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx + (i - t.level / 2) * tile * 0.18, cy + r * 0.95, tile * 0.065, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  };
+
+  const drawEnemy = (ctx: CanvasRenderingContext2D, e: sim.Enemy) => {
+    const def = enemyDef(e.type);
+    const ex = e.x * tile;
+    const step = clock * (e.boss ? 6 : 9) * (e.speed / 1.6) + e.id;
+    const flash = hitFlash.has(e.id);
+    if (hasEnemyArt(e.type)) {
+      const s = tile * ENEMY_SIZE * (e.boss ? GAME.boss.size : 1);
+      const feet = (e.y + 0.3) * tile;
+      const ahead = posAt(run.map, e.d + 0.15);
+      if (Math.abs(ahead.x - e.x) > 0.02) facing.set(e.id, ahead.x > e.x ? 1 : -1);
+      drawShadow(ctx, ex, feet, s * 0.4);
+      ctx.save();
+      ctx.translate(ex, feet);
+      ctx.scale(facing.get(e.id) ?? 1, 1);
+      if (flash) ctx.scale(1.1, 0.92);
+      drawEnemyArt(ctx, e.type, s, { walk: step, attack: null }, e.boss);
+      ctx.restore();
+      if (e.boss || e.hp < e.maxHp)
+        hpBar(ctx, ex, feet - s * enemyArtHeight(e.type) - 8, s * 0.7, 4, e.hp / e.maxHp);
+      return;
+    }
+    const size = tile * 0.62 * (e.boss ? GAME.boss.size : 1);
+    const ey = e.y * tile - Math.abs(Math.sin(step)) * tile * 0.08; // a little walking bob
+    if (flash) {
+      ctx.fillStyle = 'rgba(255,255,255,.7)';
+      ctx.beginPath();
+      ctx.arc(ex, ey, size * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(ex, ey);
+    ctx.rotate(Math.sin(step) * 0.08);
+    emoji(ctx, def.emoji, 0, 0, size * (flash ? 1.08 : 1));
+    ctx.restore();
+    if (e.boss) emoji(ctx, '👑', ex, ey - size * 0.6, size * 0.4);
+    if (e.boss || e.hp < e.maxHp) hpBar(ctx, ex, ey + size * 0.45, size * 0.9, 4, e.hp / e.maxHp);
+  };
+
   // ---------- Effects ----------
   const addPopup = (x: number, y: number, s: string, color: string, size = 0.32) =>
     popups.push({ x, y, text: s, color, t: 0, size });
@@ -396,6 +503,7 @@ export function createOuterDefenseScene(game: Game): Scene {
     for (const ev of run.events) {
       switch (ev.type) {
         case 'kill':
+          puffs.poof(ev.x * tile, ev.y * tile, tile * (ev.boss ? 0.9 : 0.5));
           addPopup(ev.x, ev.y - 0.2, `+${ev.gold}`, '#ffd34d', ev.boss ? 0.5 : 0.28);
           if (ev.boss) {
             addPopup(ev.x, ev.y - 0.7, `+${ev.chest}⚔️`, '#ffffff', 0.45);
@@ -482,6 +590,9 @@ export function createOuterDefenseScene(game: Game): Scene {
       hitFlash.clear();
       lastCooldown.clear();
       firePulse.clear();
+      lastFire.clear();
+      facing.clear();
+      puffs.clear();
       banner = { text: 'Drag a tower onto the grass', t: -1.5 };
       buildHud();
       buildPanel();
@@ -536,6 +647,7 @@ export function createOuterDefenseScene(game: Game): Scene {
       }
       const fx = paused ? 0 : dt;
       animate(fx);
+      puffs.update(fx * speed);
       popups = popups.filter((p) => (p.t += fx) < 1);
       flashes = flashes.filter((f) => (f.t += fx * speed) < 0.12);
       rings = rings.filter((r) => (r.t += fx) < 0.3);
@@ -561,75 +673,25 @@ export function createOuterDefenseScene(game: Game): Scene {
       // Selected tower's range
       if (selected) rangeCircle(ctx, selected.x, selected.y, towerRange(selected), true);
 
-      // Towers, sorted by y so lower ones overlap higher ones.
-      for (const t of [...run.towers].sort((a, b) => a.y - b.y)) {
-        const cx = t.x * tile;
-        const cy = t.y * tile;
-        const r = GAME.towerRadius * tile;
-        // A wooden platform with a blue rim, so your towers never look like scenery.
-        ctx.fillStyle = 'rgba(0,0,0,.25)';
-        ctx.beginPath();
-        ctx.ellipse(cx, cy + r * 0.62, r * 0.98, r * 0.42, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#6d4c2f';
-        ctx.beginPath();
-        ctx.ellipse(cx, cy + r * 0.48, r * 0.9, r * 0.44, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#b07f4a';
-        ctx.strokeStyle = t === selected ? '#fff' : '#4fb3ff';
-        ctx.lineWidth = t === selected ? 3 : 2;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy + r * 0.32, r * 0.9, r * 0.44, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        const pulse = (firePulse.get(t.id) ?? 0) / 0.16; // 1 right after a shot
-        const size = tile * 0.7 * (1 + pulse * 0.18);
-        emoji(ctx, towerDef(t.type).emoji, cx, cy - r * 0.15 - pulse * tile * 0.06, size);
-        for (let i = 0; i <= t.level; i++) {
-          ctx.fillStyle = '#ffd34d';
-          ctx.strokeStyle = 'rgba(0,0,0,.4)';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.arc(
-            cx + (i - t.level / 2) * tile * 0.18,
-            cy + r * 0.95,
-            tile * 0.065,
-            0,
-            Math.PI * 2,
-          );
-          ctx.fill();
-          ctx.stroke();
-        }
-      }
-
-      // Enemies
-      for (const e of run.enemies) {
-        const def = enemyDef(e.type);
-        const size = tile * 0.62 * (e.boss ? GAME.boss.size : 1);
-        const ex = e.x * tile;
-        const step = clock * (e.boss ? 6 : 9) * (e.speed / 1.6) + e.id;
-        const ey = e.y * tile - Math.abs(Math.sin(step)) * tile * 0.08; // a little walking bob
-        const flash = hitFlash.has(e.id);
-        if (flash) {
-          ctx.fillStyle = 'rgba(255,255,255,.7)';
-          ctx.beginPath();
-          ctx.arc(ex, ey, size * 0.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.save();
-        ctx.translate(ex, ey);
-        ctx.rotate(Math.sin(step) * 0.08);
-        emoji(ctx, def.emoji, 0, 0, size * (flash ? 1.08 : 1));
-        ctx.restore();
-        if (e.boss) emoji(ctx, '👑', ex, ey - size * 0.6, size * 0.4);
-        if (e.boss || e.hp < e.maxHp)
-          hpBar(ctx, ex, ey + size * 0.45, size * 0.9, 4, e.hp / e.maxHp);
-      }
+      // Towers and enemies, sorted by y so lower ones overlap higher ones.
+      const things: { y: number; draw: () => void }[] = [];
+      for (const t of run.towers) things.push({ y: t.y, draw: () => drawTower(ctx, t) });
+      for (const e of run.enemies) things.push({ y: e.y + 0.3, draw: () => drawEnemy(ctx, e) });
+      things.sort((a, b) => a.y - b.y);
+      for (const thing of things) thing.draw();
 
       // Shots
       for (const s of run.shots) {
         const shot = towerDef(s.tower).shot;
-        if (shot?.emoji) emoji(ctx, shot.emoji, s.x * tile, s.y * tile, tile * shot.size);
+        if (TOWER_LOOKS[s.tower]) {
+          // Leave from the thrower's hand and fly in a little arc.
+          let from = shotStart.get(s);
+          if (!from) shotStart.set(s, (from = { x: s.x, y: s.y }));
+          const total = Math.hypot(s.tx - from.x, s.ty - from.y) || 1;
+          const u = Math.min(1, Math.hypot(s.x - from.x, s.y - from.y) / total);
+          const lift = (1 - u) * 0.75 + Math.sin(u * Math.PI) * 0.35;
+          drawThrown(ctx, s.tower, s.x * tile, (s.y - lift) * tile, tile, clock * 12);
+        } else if (shot?.emoji) emoji(ctx, shot.emoji, s.x * tile, s.y * tile, tile * shot.size);
         else {
           ctx.fillStyle = shot?.color ?? '#fff';
           ctx.beginPath();
@@ -666,6 +728,7 @@ export function createOuterDefenseScene(game: Game): Scene {
       }
       ctx.globalAlpha = 1;
 
+      puffs.draw(ctx);
       drawDanger(ctx, w, h);
 
       // The tower being placed, with its range: white where it fits, red where it doesn't.
@@ -678,7 +741,13 @@ export function createOuterDefenseScene(game: Game): Scene {
         ctx.arc(placing.x * tile, placing.y * tile, GAME.towerRadius * tile, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 0.85;
-        emoji(ctx, def.emoji, placing.x * tile, placing.y * tile, tile * 0.7);
+        const look = TOWER_LOOKS[placing.type];
+        if (look) {
+          ctx.save();
+          ctx.translate(placing.x * tile, (placing.y + GAME.towerRadius * 0.32) * tile);
+          drawPerson(ctx, tile * PERSON_SIZE, look, { throw: -1, t: clock });
+          ctx.restore();
+        } else emoji(ctx, def.emoji, placing.x * tile, placing.y * tile, tile * 0.7);
         ctx.globalAlpha = 1;
       }
       ctx.restore();

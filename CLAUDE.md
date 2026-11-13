@@ -20,6 +20,8 @@ with and for David's kids. Must work with touch in portrait on phones, and with 
   kid's idea should usually be one entry there, with `by: '<name>'` for the in-game credit.
 - `src/scenes/` draws and handles input: `menu`, `outerDefense` (Phase 1), `lastStand` (Phase 2,
   side view, sim in `src/sim/stand.ts`), `breach` (run results), `upgrades` (spend Relics; Evolve lives here). `src/ui/` has DOM helpers and the 💡 Idea Box.
+- `src/art/` draws the cartoon sprites in code (`sprites.ts`) and maps content to them
+  (`cast.ts`). Content without art falls back to its emoji.
 - Saves: `src/save.ts`, versioned localStorage, always in try/catch. Bump the version and
   migrate when the shape changes.
 - Use the seeded RNG (`run.rng`) inside the sim, never `Math.random`.

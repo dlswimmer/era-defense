@@ -17,8 +17,8 @@ export interface EnemyDef {
 }
 
 export const ENEMIES = {
-  caveman: { name: 'Caveman', emoji: '🧔', tier: 0, hp: 20, speed: 1.0, gold: 3 },
-  mammoth: { name: 'Mammoth', emoji: '🦣', tier: 0, hp: 60, speed: 0.6, gold: 6, heavy: true },
+  caveman: { name: 'Grumbler', emoji: '👾', tier: 0, hp: 20, speed: 1.0, gold: 3 },
+  mammoth: { name: 'Woolly Brute', emoji: '🦣', tier: 0, hp: 60, speed: 0.6, gold: 6, heavy: true },
   warrior: { name: 'Warrior', emoji: '🛡️', tier: 1, hp: 50, speed: 1.0, gold: 5 },
   chariot: { name: 'Chariot', emoji: '🐎', tier: 1, hp: 80, speed: 1.5, gold: 7, heavy: true },
   knight: { name: 'Knight', emoji: '🏇', tier: 2, hp: 120, speed: 1.1, gold: 8 },

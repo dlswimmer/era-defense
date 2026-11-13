@@ -290,7 +290,7 @@ function moveEnemies(run: Run, dt: number) {
 }
 
 /** The enemy in range the tower wants most. Ties go to whoever is further along the trail. */
-function findTarget(
+export function findTarget(
   run: Run,
   x: number,
   y: number,
