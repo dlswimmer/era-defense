@@ -15,10 +15,11 @@ with and for David's kids. Must work with touch in portrait on phones, and with 
 - `src/sim/` is pure game logic (no DOM). `run.ts` holds Phase 1 rules; `step()` pushes
   `run.events` that scenes turn into effects. Tests sit next to the code (`*.test.ts`).
 - Content is data in `src/sim/data/` (eras, towers, enemies, waves, maps, game knobs,
+  `units` + `stand` for the Last Stand,
   `metaUpgrades` for Relic upgrades). Adding a
   kid's idea should usually be one entry there, with `by: '<name>'` for the in-game credit.
-- `src/scenes/` draws and handles input: `menu`, `outerDefense` (Phase 1), `breach` (results;
-  Phase 2 will start from here), `upgrades` (spend Relics; Evolve lives here). `src/ui/` has DOM helpers and the 💡 Idea Box.
+- `src/scenes/` draws and handles input: `menu`, `outerDefense` (Phase 1), `lastStand` (Phase 2,
+  side view, sim in `src/sim/stand.ts`), `breach` (run results), `upgrades` (spend Relics; Evolve lives here). `src/ui/` has DOM helpers and the 💡 Idea Box.
 - Saves: `src/save.ts`, versioned localStorage, always in try/catch. Bump the version and
   migrate when the shape changes.
 - Use the seeded RNG (`run.rng`) inside the sim, never `Math.random`.

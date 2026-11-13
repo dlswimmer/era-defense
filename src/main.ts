@@ -3,6 +3,7 @@ import './styles.css';
 import type { Game, Scene, SceneName } from './game';
 import { loadMeta } from './save';
 import { createBreachScene } from './scenes/breach';
+import { createLastStandScene } from './scenes/lastStand';
 import { createMenuScene } from './scenes/menu';
 import { createOuterDefenseScene } from './scenes/outerDefense';
 import { createUpgradesScene } from './scenes/upgrades';
@@ -25,6 +26,7 @@ const game: Game = {
 
 scenes.menu = createMenuScene(game);
 scenes.outer = createOuterDefenseScene(game);
+scenes.stand = createLastStandScene(game);
 scenes.breach = createBreachScene(game);
 scenes.upgrades = createUpgradesScene(game);
 

@@ -27,6 +27,14 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 - **First leak ends Phase 1 (Nov 13):** no wall HP bar any more. Thick Walls became Strong Arms
   (+10% tower damage per level; old saves keep their levels).
 
+- **Last Stand v1 (Phase 2, Nov 13):** after the first leak, a side view of the wall (HP =
+  era wall × 15). Enemies walk in from the right, starting with the wave that broke through,
+  and hit the wall. Four spots on the wall take defenders bought with the War Chest ⚔️ (one
+  per era for now: Spear Thrower, Boomerang Crew, Boiling Oil, Musket Line, Dynamite, Drone),
+  with 3 levels and sell. Stopping enemies refills the War Chest. When the wall falls, the
+  results show both phases; Relics = Phase 1 + 1 per wave held at the wall + 2 per boss.
+  Bot runs last 40-140 s.
+
 ## Decided in planning (Nov 13) — not built yet
 
 - **Long-running meta loop.** Runs stay short, but permanent progress should last months, with
@@ -51,8 +59,8 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   `enemies.ts`, `eras.ts`. Check with `npm run balance` after changes.
 - **Graphics pass** (David wants better art than plain emoji). The trail and grass got a first
   pass; towers and enemies are still emoji.
-- **M2 Breach + Last Stand:** side-on 2.5D view of the base. The breach scene
-  (`src/scenes/breach.ts`) already receives the run summary, including the War Chest and era.
+- **Last Stand next steps:** pick the 4 defenders per era with the kids (data in
+  `src/sim/data/units.ts`), a 2.5D look in the graphics pass, flying enemies, wall repair.
 - **M3 rest:** more upgrades (tower mastery, heroes, base blueprints), Relics from Phase 2 time.
 - **M4 Run variety:** card picks every 3 waves, event waves.
 - **M5 Polish:** sound, hero unit, base abilities, credits screen.
@@ -62,4 +70,4 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 1. One save per kid on a shared device?
 2. Game name (let the kids vote).
 
-Decided: Phase 2 is side-on 2.5D; the first leak ends Phase 1; Evolve is a Relic upgrade.
+Decided: Phase 2 is a side view; the first leak ends Phase 1; Evolve is a Relic upgrade.

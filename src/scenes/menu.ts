@@ -46,7 +46,7 @@ export function createMenuScene(game: Game): Scene {
         el(
           'p',
           { style: 'font-size:13px;margin-top:16px' },
-          'Drag a tower onto the grass to build. Stop enemies to earn 💰 gold. When one gets through, the run ends and you get 🦴 Relics: spend them to Evolve and unlock new towers!',
+          'Drag a tower onto the grass to build. Stop enemies to earn 💰 gold. When one gets through, hold the wall in the Last Stand with ⚔️ War Chest defenders. Then you get 🦴 Relics: spend them to Evolve and unlock new towers!',
         ),
       ),
     );

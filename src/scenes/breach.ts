@@ -1,4 +1,4 @@
-// Shown after the first enemy gets through. Phase 2 (the side-view Last Stand) will start from here in
+// Run results, shown after the Last Stand (Phase 2) ends. Phase 2 (the side-view Last Stand) will start from here in
 // M2. For now it shows the run's results and the Relics earned.
 import type { Game, RunSummary, Scene } from '../game';
 import { ERAS } from '../sim/data/eras';
@@ -20,14 +20,15 @@ export function createBreachScene(game: Game): Scene {
 
   const show = () => {
     const era = ERAS[summary.era]!;
-    const secs = Math.round(summary.time);
+    const stand = summary.stand;
+    const secs = Math.round(summary.time + (stand?.time ?? 0));
     const time = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
     const shop = canBuySomething();
     showOverlay(
       el(
         'div',
         { class: 'card' },
-        el('h2', {}, '🚨 They got through!'),
+        el('h2', {}, stand ? '🏰 The wall fell!' : '🚨 They got through!'),
         summary.newBest
           ? el('p', { style: 'color:var(--gold);font-weight:800' }, '🏆 New best!')
           : '',
@@ -35,15 +36,10 @@ export function createBreachScene(game: Game): Scene {
         el(
           'div',
           { class: 'stats' },
-          stat(`🌊 ${summary.wave}`, 'Wave reached'),
-          stat(`${era.base} ${era.name}`, `held for ${time}`),
-          stat(`👊 ${summary.kills}`, 'Enemies stopped'),
-          stat(`⚔️ ${summary.chest}`, 'War Chest'),
-        ),
-        el(
-          'p',
-          { class: 'teaser' },
-          '🏰 Coming soon: the Last Stand! A side view of your base where you spend the War Chest to hold out as long as you can.',
+          stat(`🌊 ${summary.wave}`, 'Got through on wave'),
+          stat(`🏰 ${stand?.held ?? 0}`, 'Waves held at the wall'),
+          stat(`👊 ${summary.kills + (stand?.kills ?? 0)}`, 'Enemies stopped'),
+          stat(`${era.base} ${time}`, `${era.name} run`),
         ),
         el(
           'div',

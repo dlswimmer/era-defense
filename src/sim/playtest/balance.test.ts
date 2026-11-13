@@ -2,7 +2,7 @@
 // check it still feels right with the kids, then update the bands.
 import { describe, expect, it } from 'vitest';
 import { ERAS } from '../data/eras';
-import { playRun } from './bot';
+import { playRun, playStand } from './bot';
 
 const seeds = [1, 2, 3, 4];
 
@@ -28,6 +28,16 @@ describe('balance', () => {
       expect(r.time).toBeGreaterThan(60);
       expect(r.time).toBeLessThan(5 * 60);
       expect(r.held).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('the Last Stand is short too and the wall always falls', () => {
+    for (let era = 0; era < ERAS.length; era++) {
+      const r = playRun(seeds[0]!, { era });
+      const s = playStand(seeds[0]!, { era, wave: r.wave, chest: r.chest });
+      expect(s.time).toBeGreaterThan(25);
+      expect(s.time).toBeLessThan(4 * 60);
+      expect(s.held).toBeGreaterThanOrEqual(1);
     }
   });
 });

@@ -3,6 +3,21 @@ import { towerDef, TOWER_IDS, type TowerId } from '../data/towers';
 import { relicsEarned, type RunOptions } from '../data/metaUpgrades';
 import { posAt, type Point } from '../path';
 import * as sim from '../run';
+import { UNIT_IDS, unitDef } from '../data/units';
+import {
+  createStand,
+  firstFreeSlot,
+  hire,
+  isUnitUnlocked,
+  nextUnitCost,
+  promote,
+  standRelics,
+  standWavesHeld,
+  stepStand,
+  type Defender,
+  type Stand,
+  type StandOptions,
+} from '../stand';
 
 export interface BotResult {
   wave: number;
@@ -105,5 +120,51 @@ export function playRun(
     towers: run.towers.length,
     time: run.time,
     relics: relicsEarned(run),
+  };
+}
+
+/** Spend the War Chest in the Last Stand: fill the wall with the best defender, then upgrade. */
+export function spendStand(stand: Stand) {
+  for (let guard = 0; guard < 50; guard++) {
+    const pick = UNIT_IDS.filter(
+      (id) => isUnitUnlocked(stand, id) && stand.chest >= unitDef(id).cost,
+    ).sort((a, b) => unitDef(b).cost - unitDef(a).cost)[0];
+    if (pick && firstFreeSlot(stand) >= 0 && hire(stand, pick)) continue;
+    const up = stand.slots
+      .filter((u): u is Defender => !!u)
+      .map((u) => ({ u, cost: nextUnitCost(u) }))
+      .filter((x): x is { u: Defender; cost: number } => x.cost !== null && x.cost <= stand.chest)
+      .sort((a, b) => a.cost - b.cost)[0];
+    if (up && promote(stand, up.u)) continue;
+    return;
+  }
+}
+
+export interface StandResult {
+  time: number;
+  held: number;
+  wave: number;
+  relics: number;
+}
+
+/** Plays a Last Stand until the wall falls (or a time limit, in seconds of game time). */
+export function playStand(seed: number, opts: StandOptions, maxTime = 1800): StandResult {
+  const stand = createStand(seed, opts);
+  spendStand(stand);
+  let since = 0;
+  while (!stand.over && stand.time < maxTime) {
+    stepStand(stand, 0.05);
+    stand.events.length = 0;
+    since += 0.05;
+    if (since >= 1) {
+      since = 0;
+      spendStand(stand);
+    }
+  }
+  return {
+    time: stand.time,
+    held: standWavesHeld(stand),
+    wave: stand.wave,
+    relics: standRelics(stand),
   };
 }

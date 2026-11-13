@@ -13,7 +13,7 @@ export interface Scene {
   onResize?(): void;
 }
 
-export type SceneName = 'menu' | 'outer' | 'breach' | 'upgrades';
+export type SceneName = 'menu' | 'outer' | 'stand' | 'breach' | 'upgrades';
 
 export interface Game {
   canvas: HTMLCanvasElement;
@@ -31,6 +31,8 @@ export interface RunSummary {
   bosses: number;
   held: number;
   time: number;
-  relics: number;
+  relics: number; // Phase 1 + Last Stand
   newBest: boolean;
+  /** The Last Stand (Phase 2), once it has been played. */
+  stand?: { held: number; wave: number; kills: number; time: number; relics: number };
 }

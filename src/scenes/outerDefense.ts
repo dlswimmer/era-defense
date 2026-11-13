@@ -455,7 +455,7 @@ export function createOuterDefenseScene(game: Game): Scene {
       relics,
       newBest,
     };
-    game.go('breach', summary);
+    game.go('stand', summary); // Relics so far are saved; the Last Stand adds its own
   };
 
   const onVisibility = () => {

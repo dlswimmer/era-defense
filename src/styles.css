@@ -96,6 +96,36 @@ body {
 .hud-chip.gold {
   color: var(--gold);
 }
+.wall-row {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.wall-bar {
+  flex: 1;
+  height: 14px;
+  background: #0f1822;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 2px solid #0f1822;
+}
+.wall-fill {
+  height: 100%;
+  background: var(--good);
+  border-radius: 999px;
+  transition:
+    width 0.2s,
+    background-color 0.2s;
+}
+.wall-fill.mid {
+  background: #ffb547;
+}
+.wall-fill.low {
+  background: var(--bad);
+}
 /* ---------- Stage ---------- */
 #stage {
   flex: 1;
