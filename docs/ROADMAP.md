@@ -19,6 +19,11 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   tower in the shop and drag it onto the map (or tap it, then tap the map); the range circle
   shows white where it fits and red where it doesn't. On touch the tower floats above your
   finger. Grass, trail and scenery are drawn once per era and cached.
+- **Phase 1 polish (Nov 13):** towers stand on wooden platforms with a blue rim (Stone Age
+  scenery is now plants and logs, not rocks), enemies bob and flash when hit, towers bounce
+  when they fire, chevrons show the trail entrance between waves, the base pulses red when an
+  enemy gets within 6 tiles, and each tower can aim at First, Strong or Close. The map is a
+  little bigger on phones.
 - **First leak ends Phase 1 (Nov 13):** no wall HP bar any more. Thick Walls became Strong Arms
   (+10% tower damage per level; old saves keep their levels).
 

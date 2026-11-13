@@ -4,6 +4,7 @@ import { GAME } from './data/game';
 import { runOptions } from './data/metaUpgrades';
 import { towerDef, upgradeCost } from './data/towers';
 import { WAVES } from './data/waves';
+import { posAt } from './path';
 import { bestSpot } from './playtest/bot';
 import * as sim from './run';
 
@@ -75,6 +76,51 @@ describe('building', () => {
     expect(sim.sell(run, tower)).toBe(Math.floor(spent * 0.7));
     expect(run.gold).toBe(before + Math.floor(spent * 0.7));
     expect(run.towers).toHaveLength(0);
+  });
+});
+
+describe('targeting', () => {
+  /** One tower and three enemies in range: near the end, tough, and right next to the tower. */
+  const setup = (mode: sim.Targeting) => {
+    const run = sim.createRun(1);
+    const tower = sim.build(run, 'rock', 5, 3.8)!;
+    tower.targeting = mode;
+    const at = (d: number, hp: number) => {
+      const p = posAt(run.map, d);
+      run.enemies.push({
+        id: run.nextId++,
+        type: 'caveman',
+        boss: false,
+        tier: 0,
+        hp,
+        maxHp: hp,
+        speed: 0,
+        d,
+        ...p,
+      });
+    };
+    // Pick trail spots in range, at different distances from the tower.
+    const inRange = [] as { d: number; dist: number }[];
+    for (let d = 0; d < run.map.length; d += 0.1) {
+      const p = posAt(run.map, d);
+      const dist = Math.hypot(p.x - 5, p.y - 3.8);
+      if (dist < 2) inRange.push({ d, dist });
+    }
+    const nearest = inRange.reduce((a, b) => (b.dist < a.dist ? b : a));
+    const last = inRange[inRange.length - 1]!;
+    const firstSeen = inRange[0]!;
+    at(last.d, 10); // furthest along
+    at(firstSeen.d, 999); // toughest
+    at(nearest.d, 10); // closest
+    sim.step(run, 0.01);
+    const shot = run.shots[0]!;
+    return run.enemies.findIndex((e) => e.id === shot.targetId);
+  };
+
+  it('aims at the first, the strongest or the closest enemy', () => {
+    expect(setup('first')).toBe(0);
+    expect(setup('strong')).toBe(1);
+    expect(setup('close')).toBe(2);
   });
 });
 

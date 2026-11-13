@@ -1,13 +1,13 @@
 // Phase 1: Outer Defense. Draws the run and turns taps into sim actions (src/sim/run.ts).
 import type { Game, RunSummary, Scene } from '../game';
-import { emoji, fitCanvas, hpBar, drawMap, shade, text } from '../render';
+import { emoji, fitCanvas, hpBar, drawMap, text } from '../render';
 import { saveMeta } from '../save';
 import { ERAS } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
 import { GAME } from '../sim/data/game';
 import { relicsEarned, runOptions } from '../sim/data/metaUpgrades';
 import { TOWER_IDS, towerDef, sellValue, type TowerId } from '../sim/data/towers';
-import type { Point } from '../sim/path';
+import { posAt, type Point } from '../sim/path';
 import * as sim from '../sim/run';
 import { openIdeaBox } from '../ui/ideas';
 import { $, el, setDisabled, setText } from '../ui/dom';
@@ -36,6 +36,8 @@ interface Ring {
 const BREACH_TIME = 2.6;
 /** On touch screens the tower being placed floats this far (in tiles) above the finger. */
 const TOUCH_LIFT = 1.1;
+/** How close (in tiles of trail) an enemy gets to the base before the danger warning shows. */
+const DANGER_TILES = 6;
 
 /** A tower picked from the shop that is being dragged onto the map. */
 interface Placing {
@@ -59,6 +61,12 @@ export function createOuterDefenseScene(game: Game): Scene {
   let shake = 0;
   let breachTimer = -1;
   let banner: { text: string; t: number } | null = null;
+  // Little animations worked out from the sim state each frame (the sim doesn't need them).
+  let clock = 0;
+  const lastHp = new Map<number, number>();
+  const hitFlash = new Map<number, number>(); // enemy id -> seconds of white flash left
+  const lastCooldown = new Map<number, number>();
+  const firePulse = new Map<number, number>(); // tower id -> seconds of "throw" bounce left
 
   // ---------- HUD ----------
   const hud = {
@@ -144,14 +152,30 @@ export function createOuterDefenseScene(game: Game): Scene {
     else costButtons.push({ btn: upBtn, cost: () => sim.nextUpgradeCost(tower) });
     const statLine = (label: string, now: number, then?: number) =>
       `${label} ${fmt(now)}${then !== undefined && then !== now ? ` → ${fmt(then)}` : ''}`;
+    const aim = el(
+      'div',
+      { class: 'aim' },
+      ...sim.TARGETING.map((mode) =>
+        el(
+          'button',
+          {
+            class: `btn${tower.targeting === mode ? ' on' : ''}`,
+            onclick: () => {
+              tower.targeting = mode;
+              renderContext();
+            },
+          },
+          AIM_LABELS[mode],
+        ),
+      ),
+    );
     return el(
       'div',
       { class: 'info' },
-      el('div', { class: 'big' }, def.emoji),
       el(
         'div',
         { class: 'txt' },
-        el('b', {}, `${def.name} ${'⭐'.repeat(tower.level + 1)}`),
+        el('b', {}, `${def.emoji} ${def.name} ${'⭐'.repeat(tower.level + 1)}`),
         el(
           'div',
           {},
@@ -162,6 +186,7 @@ export function createOuterDefenseScene(game: Game): Scene {
           ].join('  ·  '),
         ),
         def.by ? el('div', { class: 'credit' }, `Designed by ${def.by}`) : '',
+        aim,
       ),
       el(
         'div',
@@ -290,6 +315,78 @@ export function createOuterDefenseScene(game: Game): Scene {
     ctx.setLineDash([]);
   };
 
+  /** Spots hits and shots by comparing with last frame, and runs down the animation timers. */
+  const animate = (fx: number) => {
+    clock += fx * speed;
+    for (const [id, t] of hitFlash)
+      if (t - fx <= 0) hitFlash.delete(id);
+      else hitFlash.set(id, t - fx);
+    for (const [id, t] of firePulse)
+      if (t - fx <= 0) firePulse.delete(id);
+      else firePulse.set(id, t - fx);
+    const alive = new Set<number>();
+    for (const e of run.enemies) {
+      alive.add(e.id);
+      const before = lastHp.get(e.id);
+      if (before !== undefined && e.hp < before) hitFlash.set(e.id, 0.1);
+      lastHp.set(e.id, e.hp);
+    }
+    for (const id of lastHp.keys()) if (!alive.has(id)) lastHp.delete(id);
+    for (const t of run.towers) {
+      if (t.cooldown > (lastCooldown.get(t.id) ?? 0) + 0.01) firePulse.set(t.id, 0.16);
+      lastCooldown.set(t.id, t.cooldown);
+    }
+  };
+
+  /** Chevrons at the trail entrance between waves: "they come from here". */
+  const drawEntrance = (ctx: CanvasRenderingContext2D) => {
+    for (let i = 0; i < 3; i++) {
+      const d = 1.6 + i * 0.7;
+      const p = posAt(run.map, d);
+      const q = posAt(run.map, d + 0.3);
+      const a = Math.atan2(q.y - p.y, q.x - p.x);
+      const wave = (Math.sin(clock * 5 - i * 1.2) + 1) / 2;
+      ctx.save();
+      ctx.translate(p.x * tile, p.y * tile);
+      ctx.rotate(a);
+      ctx.globalAlpha = 0.35 + wave * 0.65;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-tile * 0.16, -tile * 0.26);
+      ctx.lineTo(tile * 0.14, 0);
+      ctx.lineTo(-tile * 0.16, tile * 0.26);
+      ctx.strokeStyle = 'rgba(0,0,0,.45)';
+      ctx.lineWidth = tile * 0.16;
+      ctx.stroke();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = tile * 0.09;
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  /** A red pulse around the base and the screen edges when an enemy is close to getting through. */
+  const drawDanger = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    let furthest = 0;
+    for (const e of run.enemies) furthest = Math.max(furthest, e.d);
+    const left = run.map.length - furthest;
+    if (!run.enemies.length || left > DANGER_TILES) return;
+    const level = 1 - left / DANGER_TILES;
+    const pulse = 0.6 + 0.4 * Math.sin(clock * 12);
+    const { base } = run.map;
+    ctx.strokeStyle = `rgba(255,60,60,${level * pulse})`;
+    ctx.lineWidth = tile * 0.12;
+    ctx.beginPath();
+    ctx.arc(base.x * tile, base.y * tile, tile * (0.8 + 0.12 * pulse), 0, Math.PI * 2);
+    ctx.stroke();
+    const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, h * 0.75);
+    g.addColorStop(0, 'rgba(255,40,40,0)');
+    g.addColorStop(1, `rgba(255,40,40,${0.35 * level * pulse})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  };
+
   // ---------- Effects ----------
   const addPopup = (x: number, y: number, s: string, color: string, size = 0.32) =>
     popups.push({ x, y, text: s, color, t: 0, size });
@@ -380,6 +477,11 @@ export function createOuterDefenseScene(game: Game): Scene {
       rings = [];
       shake = 0;
       breachTimer = -1;
+      clock = 0;
+      lastHp.clear();
+      hitFlash.clear();
+      lastCooldown.clear();
+      firePulse.clear();
       banner = { text: 'Drag a tower onto the grass', t: -1.5 };
       buildHud();
       buildPanel();
@@ -433,6 +535,7 @@ export function createOuterDefenseScene(game: Game): Scene {
         handleEvents();
       }
       const fx = paused ? 0 : dt;
+      animate(fx);
       popups = popups.filter((p) => (p.t += fx) < 1);
       flashes = flashes.filter((f) => (f.t += fx * speed) < 0.12);
       rings = rings.filter((r) => (r.t += fx) < 0.3);
@@ -453,27 +556,35 @@ export function createOuterDefenseScene(game: Game): Scene {
       }
       drawMap(ctx, run.map, era, tile);
 
+      if (!sim.isSpawning(run) && !run.breached) drawEntrance(ctx);
+
       // Selected tower's range
       if (selected) rangeCircle(ctx, selected.x, selected.y, towerRange(selected), true);
 
       // Towers, sorted by y so lower ones overlap higher ones.
-      const pad = shade(era.path, -0.18);
       for (const t of [...run.towers].sort((a, b) => a.y - b.y)) {
         const cx = t.x * tile;
         const cy = t.y * tile;
         const r = GAME.towerRadius * tile;
-        ctx.fillStyle = 'rgba(0,0,0,.22)';
+        // A wooden platform with a blue rim, so your towers never look like scenery.
+        ctx.fillStyle = 'rgba(0,0,0,.25)';
         ctx.beginPath();
-        ctx.ellipse(cx, cy + r * 0.55, r * 0.95, r * 0.42, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx, cy + r * 0.62, r * 0.98, r * 0.42, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = pad;
-        ctx.strokeStyle = t === selected ? '#fff' : 'rgba(0,0,0,.35)';
-        ctx.lineWidth = t === selected ? 3 : 1.5;
+        ctx.fillStyle = '#6d4c2f';
         ctx.beginPath();
-        ctx.ellipse(cx, cy + r * 0.35, r * 0.85, r * 0.45, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx, cy + r * 0.48, r * 0.9, r * 0.44, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#b07f4a';
+        ctx.strokeStyle = t === selected ? '#fff' : '#4fb3ff';
+        ctx.lineWidth = t === selected ? 3 : 2;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + r * 0.32, r * 0.9, r * 0.44, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        emoji(ctx, towerDef(t.type).emoji, cx, cy - r * 0.1, tile * 0.7);
+        const pulse = (firePulse.get(t.id) ?? 0) / 0.16; // 1 right after a shot
+        const size = tile * 0.7 * (1 + pulse * 0.18);
+        emoji(ctx, towerDef(t.type).emoji, cx, cy - r * 0.15 - pulse * tile * 0.06, size);
         for (let i = 0; i <= t.level; i++) {
           ctx.fillStyle = '#ffd34d';
           ctx.strokeStyle = 'rgba(0,0,0,.4)';
@@ -496,8 +607,20 @@ export function createOuterDefenseScene(game: Game): Scene {
         const def = enemyDef(e.type);
         const size = tile * 0.62 * (e.boss ? GAME.boss.size : 1);
         const ex = e.x * tile;
-        const ey = e.y * tile;
-        emoji(ctx, def.emoji, ex, ey, size);
+        const step = clock * (e.boss ? 6 : 9) * (e.speed / 1.6) + e.id;
+        const ey = e.y * tile - Math.abs(Math.sin(step)) * tile * 0.08; // a little walking bob
+        const flash = hitFlash.has(e.id);
+        if (flash) {
+          ctx.fillStyle = 'rgba(255,255,255,.7)';
+          ctx.beginPath();
+          ctx.arc(ex, ey, size * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.save();
+        ctx.translate(ex, ey);
+        ctx.rotate(Math.sin(step) * 0.08);
+        emoji(ctx, def.emoji, 0, 0, size * (flash ? 1.08 : 1));
+        ctx.restore();
         if (e.boss) emoji(ctx, '👑', ex, ey - size * 0.6, size * 0.4);
         if (e.boss || e.hp < e.maxHp)
           hpBar(ctx, ex, ey + size * 0.45, size * 0.9, 4, e.hp / e.maxHp);
@@ -542,6 +665,8 @@ export function createOuterDefenseScene(game: Game): Scene {
         text(ctx, p.text, p.x * tile, (p.y - p.t * 0.6) * tile, tile * p.size, p.color);
       }
       ctx.globalAlpha = 1;
+
+      drawDanger(ctx, w, h);
 
       // The tower being placed, with its range: white where it fits, red where it doesn't.
       if (placing?.show) {
@@ -592,5 +717,11 @@ export function createOuterDefenseScene(game: Game): Scene {
     },
   };
 }
+
+const AIM_LABELS: Record<sim.Targeting, string> = {
+  first: '🏃 First',
+  strong: '💪 Strong',
+  close: '📍 Close',
+};
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));

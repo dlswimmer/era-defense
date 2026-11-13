@@ -28,7 +28,7 @@ export const ERAS: Era[] = [
     ground: '#7fb653',
     ground2: '#76ad4b',
     path: '#d8b97c',
-    decor: ['🌿', '🪨', '🌳'],
+    decor: ['🌿', '🪵', '🌳'],
   },
   {
     id: 'ancient',

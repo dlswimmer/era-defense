@@ -18,7 +18,12 @@ export interface Tower {
   level: number; // 0, 1 or 2
   spent: number;
   cooldown: number;
+  targeting: Targeting;
 }
+
+/** Which enemy in range a tower aims at: furthest along the trail, toughest, or nearest. */
+export type Targeting = 'first' | 'strong' | 'close';
+export const TARGETING: Targeting[] = ['first', 'strong', 'close'];
 
 export interface Enemy {
   id: number;
@@ -158,7 +163,16 @@ export function build(run: Run, type: TowerId, x: number, y: number): Tower | nu
   if (!canBuild(run, type, x, y)) return null;
   const cost = towerDef(type).cost;
   run.gold -= cost;
-  const tower: Tower = { id: run.nextId++, type, x, y, level: 0, spent: cost, cooldown: 0 };
+  const tower: Tower = {
+    id: run.nextId++,
+    type,
+    x,
+    y,
+    level: 0,
+    spent: cost,
+    cooldown: 0,
+    targeting: 'first',
+  };
   run.towers.push(tower);
   return tower;
 }
@@ -275,13 +289,26 @@ function moveEnemies(run: Run, dt: number) {
   }
 }
 
-/** The enemy in range that is furthest along the path. */
-function findTarget(run: Run, x: number, y: number, range: number): Enemy | undefined {
+/** The enemy in range the tower wants most. Ties go to whoever is further along the trail. */
+function findTarget(
+  run: Run,
+  x: number,
+  y: number,
+  range: number,
+  mode: Targeting = 'first',
+): Enemy | undefined {
   let best: Enemy | undefined;
+  let bestScore = -Infinity;
   for (const e of run.enemies) {
     if (e.hp <= 0) continue;
-    if (Math.hypot(e.x - x, e.y - y) > range) continue;
-    if (!best || e.d > best.d) best = e;
+    const dist = Math.hypot(e.x - x, e.y - y);
+    if (dist > range) continue;
+    const main = mode === 'strong' ? e.hp : mode === 'close' ? -dist : e.d;
+    const score = main * 1000 + e.d;
+    if (score > bestScore) {
+      bestScore = score;
+      best = e;
+    }
   }
   return best;
 }
@@ -294,7 +321,7 @@ function fireTowers(run: Run, dt: number) {
     const stats = def.levels[t.level]!;
     const { x, y } = t;
     const dmg = stats.dmg * run.damageBonus;
-    const target = findTarget(run, x, y, stats.range);
+    const target = findTarget(run, x, y, stats.range, t.targeting);
     if (!target) {
       t.cooldown = 0;
       continue;
