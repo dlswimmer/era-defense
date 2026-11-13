@@ -1,0 +1,15 @@
+{
+  "name": "Era Defense",
+  "short_name": "Era Defense",
+  "description": "Build towers, evolve from rocks to lasers, and hold the wall.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#1d2b3a",
+  "theme_color": "#1d2b3a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
