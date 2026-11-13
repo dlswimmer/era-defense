@@ -54,13 +54,14 @@ export function drawEnemyArt(
   s: number,
   pose: MonsterPose,
   boss: boolean,
+  rank = 0,
 ): boolean {
   const art = ENEMY_ART[id];
-  if (art === 'grumbler') drawGrumbler(ctx, s, pose);
+  if (art === 'grumbler') drawGrumbler(ctx, s, pose, rank);
   else if (art === 'brute') {
     ctx.save();
     ctx.translate(-0.14 * s, 0); // its middle, so it sits centered on its spot
-    drawBrute(ctx, s, pose, boss);
+    drawBrute(ctx, s, pose, boss, rank);
     ctx.restore();
   } else return false;
   return true;

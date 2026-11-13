@@ -39,6 +39,10 @@ Why things are the way they are. Keep this current when a decision changes.
   the levels). The balance test now checks every era is a short run (1-5 minutes).
 - **Waves never stop getting harder**, so every run ends with a leak (and Phase 2). Enemy HP
   ramps within each 5-wave tier, so the end of a tier is the wall your era has to beat.
+- **Waves stay in your era** (David, Nov 13): enemy tiers stop at the run's era, so next-era
+  enemies are a surprise for after you evolve. Past the era's own tiers, HP grows
+  `WAVES.pastEraGrowth` per wave instead, and every 5 waves the same monsters level up in looks
+  (`rankFor`: new color, then a bone helmet, hide armor, back spikes).
 - **War Chest** is separate from gold and only counts up: 1 + tier per kill, plus
   20 × (tier + 1) per boss.
 - **UI is DOM, map is canvas.** Buttons in the panel are built once and only toggled each
