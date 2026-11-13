@@ -7,7 +7,7 @@ import { enemyDef, type EnemyId } from './data/enemies';
 import { GAME } from './data/game';
 import { BOOSTS, STAND, boostEffect, type Boost, type BoostId } from './data/stand';
 import { unitDef, type UnitId } from './data/units';
-import { buildWave, hpScale, type Spawn } from './data/waves';
+import { buildWave, hpScale, rankFor, type Spawn } from './data/waves';
 import { createRng, type Rng } from './rng';
 
 /** A position on the field. x along the field, y height (down is +), z depth into the screen. */
@@ -29,6 +29,7 @@ export interface Attacker {
   type: EnemyId;
   boss: boolean;
   tier: number;
+  rank: number; // how leveled-up it looks (see rankFor)
   hp: number;
   maxHp: number;
   speed: number;
@@ -231,7 +232,7 @@ function waves(stand: Stand, dt: number) {
   stand.nextWaveIn -= dt;
   if (stand.nextWaveIn > 0) return;
   stand.wave++;
-  const wave = buildWave(stand.wave, stand.rng);
+  const wave = buildWave(stand.wave, stand.rng, stand.era);
   stand.queue = wave.spawns;
   stand.gap = wave.gap;
   stand.spawnTimer = 0;
@@ -244,12 +245,13 @@ function waves(stand: Stand, dt: number) {
 
 function spawn(stand: Stand, sp: Spawn) {
   const def = enemyDef(sp.id);
-  const hp = Math.round(def.hp * hpScale(stand.wave) * (sp.boss ? GAME.boss.hp : 1));
+  const hp = Math.round(def.hp * hpScale(stand.wave, stand.era) * (sp.boss ? GAME.boss.hp : 1));
   stand.enemies.push({
     id: stand.nextId++,
     type: sp.id,
     boss: sp.boss,
     tier: def.tier,
+    rank: rankFor(stand.wave, stand.era),
     hp,
     maxHp: hp,
     speed: def.speed * STAND.enemySpeed * (sp.boss ? 0.8 : 1),

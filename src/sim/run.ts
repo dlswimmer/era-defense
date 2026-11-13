@@ -6,7 +6,7 @@ import { GAME } from './data/game';
 import { MAPS } from './data/maps';
 import type { RunOptions } from './data/metaUpgrades';
 import { towerDef, upgradeCost, sellValue, type TowerId } from './data/towers';
-import { buildWave, hpScale, WAVES, type Spawn } from './data/waves';
+import { buildWave, hpScale, rankFor, WAVES, type Spawn } from './data/waves';
 import { distToTrail, posAt, prepareMap, type Point, type PreparedMap } from './path';
 import { createRng, type Rng } from './rng';
 
@@ -30,6 +30,7 @@ export interface Enemy {
   type: EnemyId;
   boss: boolean;
   tier: number;
+  rank: number; // how leveled-up it looks (see rankFor)
   hp: number;
   maxHp: number;
   speed: number;
@@ -216,7 +217,7 @@ export function startWave(run: Run): boolean {
   run.gold += bonus;
   run.started = true;
   run.wave++;
-  const wave = buildWave(run.wave, run.rng);
+  const wave = buildWave(run.wave, run.rng, run.era);
   run.queue = wave.spawns;
   run.gap = wave.gap;
   run.spawnTimer = 0;
@@ -257,13 +258,14 @@ function spawnEnemies(run: Run, dt: number) {
   run.spawnTimer = run.gap;
   const spawn = run.queue.shift()!;
   const def = enemyDef(spawn.id);
-  const hp = Math.round(def.hp * hpScale(run.wave) * (spawn.boss ? GAME.boss.hp : 1));
+  const hp = Math.round(def.hp * hpScale(run.wave, run.era) * (spawn.boss ? GAME.boss.hp : 1));
   const start = posAt(run.map, 0);
   run.enemies.push({
     id: run.nextId++,
     type: spawn.id,
     boss: spawn.boss,
     tier: def.tier,
+    rank: rankFor(run.wave, run.era),
     hp,
     maxHp: hp,
     speed: def.speed * GAME.enemySpeed * (spawn.boss ? 0.8 : 1),

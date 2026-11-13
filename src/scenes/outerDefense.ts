@@ -471,7 +471,7 @@ export function createOuterDefenseScene(game: Game): Scene {
       ctx.translate(ex, feet);
       ctx.scale(facing.get(e.id) ?? 1, 1);
       if (flash) ctx.scale(1.1, 0.92);
-      drawEnemyArt(ctx, e.type, s, { walk: step, attack: null }, e.boss);
+      drawEnemyArt(ctx, e.type, s, { walk: step, attack: null }, e.boss, e.rank);
       ctx.restore();
       if (e.boss || e.hp < e.maxHp)
         hpBar(ctx, ex, feet - s * enemyArtHeight(e.type) - 8, s * 0.7, 4, e.hp / e.maxHp);

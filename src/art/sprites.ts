@@ -365,14 +365,79 @@ export interface MonsterPose {
 }
 
 /** The Grumbler: a grumpy one-eyed furball with a club. */
-export function drawGrumbler(ctx: Ctx, s: number, pose: MonsterPose) {
+/** Monster colors by rank: they level up every few waves with a new color, then gear. */
+const GRUMBLER_FUR = [
+  ['#7d68c9', '#5a479e'],
+  ['#e0843a', '#b05f22'],
+  ['#d4483b', '#9c2d24'],
+  ['#4b4f5c', '#2f323b'],
+] as const;
+const BRUTE_FUR = [
+  ['#8a5a36', '#5e3b20'],
+  ['#6f7f99', '#4b5870'],
+  ['#8c3a2e', '#5f2219'],
+  ['#3a3440', '#221e27'],
+] as const;
+const BONE = '#efe2c4';
+const HIDE = '#8b5a2b';
+const furFor = (table: typeof GRUMBLER_FUR | typeof BRUTE_FUR, rank: number) =>
+  table[Math.min(rank, table.length - 1)]!;
+
+/** A row of bone spikes along an arc (the monster's back). */
+function backSpikes(
+  ctx: Ctx,
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  from: number,
+  to: number,
+  n: number,
+  h: number,
+  lw: number,
+) {
+  for (let i = 0; i < n; i++) {
+    const a = from + ((to - from) * (i + 0.5)) / n;
+    const x = cx + Math.cos(a) * rx;
+    const y = cy + Math.sin(a) * ry;
+    const nx = Math.cos(a);
+    const ny = Math.sin(a);
+    polygon(ctx, [
+      [x - ny * h * 0.35, y + nx * h * 0.35],
+      [x + nx * h, y + ny * h],
+      [x + ny * h * 0.35, y - nx * h * 0.35],
+    ]);
+    fillStroke(ctx, BONE, lw);
+  }
+}
+
+/** Studded hide armor over the belly or back. */
+function hideArmor(ctx: Ctx, x: number, y: number, rx: number, ry: number, lw: number) {
+  oval(ctx, x, y, rx, ry);
+  fillStroke(ctx, HIDE, lw);
+  ctx.fillStyle = '#c9c4ba';
+  for (const [dx, dy] of [
+    [-0.5, -0.2],
+    [0, -0.45],
+    [0.5, -0.2],
+    [-0.25, 0.3],
+    [0.25, 0.3],
+  ] as const) {
+    circle(ctx, x + dx * rx, y + dy * ry, Math.max(1, rx * 0.09));
+    ctx.fill();
+    ctx.lineWidth = lw * 0.6;
+    ctx.strokeStyle = OUTLINE;
+    ctx.stroke();
+  }
+}
+
+export function drawGrumbler(ctx: Ctx, s: number, pose: MonsterPose, rank = 0) {
   const lw = Math.max(1, s * 0.032);
   ctx.lineJoin = 'round';
   const w = pose.attack === null ? pose.walk : 0;
   const sw = Math.sin(w) * 0.09 * s;
   const bob = -Math.abs(Math.sin(w)) * 0.06 * s;
-  const fur = '#7d68c9';
-  const dark = '#5a479e';
+  const [fur, dark] = furFor(GRUMBLER_FUR, rank);
   oval(ctx, -0.12 * s + sw, -0.04 * s, 0.1 * s, 0.055 * s);
   fillStroke(ctx, dark, lw);
   oval(ctx, 0.12 * s - sw, -0.04 * s, 0.1 * s, 0.055 * s);
@@ -396,11 +461,25 @@ export function drawGrumbler(ctx: Ctx, s: number, pose: MonsterPose) {
   oval(ctx, 0.05 * s, -0.27 * s, 0.17 * s, 0.13 * s);
   ctx.fillStyle = 'rgba(255,255,255,.22)';
   ctx.fill();
+  if (rank >= 3)
+    backSpikes(
+      ctx,
+      0,
+      -0.42 * s,
+      0.33 * s,
+      0.36 * s,
+      Math.PI * 0.75,
+      Math.PI * 1.3,
+      4,
+      0.12 * s,
+      lw,
+    );
+  if (rank >= 2) hideArmor(ctx, 0.05 * s, -0.15 * s, 0.19 * s, 0.1 * s, lw);
   // one big eye with a grumpy brow
   circle(ctx, 0.08 * s, -0.5 * s, 0.13 * s);
   fillStroke(ctx, '#fffaf0', lw);
   circle(ctx, 0.13 * s, -0.49 * s, 0.065 * s);
-  ctx.fillStyle = OUTLINE;
+  ctx.fillStyle = rank >= 3 ? '#e8a020' : OUTLINE;
   ctx.fill();
   circle(ctx, 0.15 * s, -0.51 * s, 0.02 * s);
   ctx.fillStyle = '#fff';
@@ -429,6 +508,20 @@ export function drawGrumbler(ctx: Ctx, s: number, pose: MonsterPose) {
     ctx.lineWidth = lw * 0.7;
     ctx.stroke();
   }
+  if (rank >= 1) {
+    // a bone skull-cap helmet, with the horns poking through
+    ctx.beginPath();
+    ctx.arc(0.02 * s, -0.66 * s, 0.25 * s, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.closePath();
+    fillStroke(ctx, BONE, lw);
+    ctx.beginPath();
+    ctx.moveTo(0.06 * s, -0.9 * s);
+    ctx.lineTo(0.03 * s, -0.82 * s);
+    ctx.lineTo(0.07 * s, -0.76 * s);
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = lw * 0.7;
+    ctx.stroke();
+  }
   // front arm with the club
   const ca =
     pose.attack === null
@@ -452,12 +545,11 @@ export function drawGrumbler(ctx: Ctx, s: number, pose: MonsterPose) {
  * The Woolly Brute: a big shaggy four-legged monster with tusks. The boss gets a bone crown and
  * war paint. It is about 1.4 × s long; the feet are centered around x = 0.
  */
-export function drawBrute(ctx: Ctx, s: number, pose: MonsterPose, boss = false) {
+export function drawBrute(ctx: Ctx, s: number, pose: MonsterPose, boss = false, rank = 0) {
   const lw = Math.max(1, s * 0.028);
   ctx.lineJoin = 'round';
   const w = pose.attack === null ? pose.walk : 0;
-  const fur = '#8a5a36';
-  const dark = '#5e3b20';
+  const [fur, dark] = furFor(BRUTE_FUR, rank);
   const bob = -Math.abs(Math.sin(w)) * 0.03 * s;
   const legs: [number, number][] = [
     [-0.36, 0],
@@ -498,6 +590,20 @@ export function drawBrute(ctx: Ctx, s: number, pose: MonsterPose, boss = false) 
     ctx.quadraticCurveTo((x + 0.05) * s, -0.55 * s, (x - 0.02) * s, -0.35 * s);
     ctx.stroke();
   }
+  if (rank >= 3)
+    backSpikes(
+      ctx,
+      0,
+      -0.55 * s,
+      0.56 * s,
+      0.33 * s,
+      Math.PI * 1.15,
+      Math.PI * 1.85,
+      5,
+      0.13 * s,
+      lw,
+    );
+  if (rank >= 2) hideArmor(ctx, -0.05 * s, -0.68 * s, 0.32 * s, 0.17 * s, lw);
   if (boss) {
     ctx.strokeStyle = '#d8402f';
     ctx.lineWidth = 0.05 * s;
@@ -548,6 +654,16 @@ export function drawBrute(ctx: Ctx, s: number, pose: MonsterPose, boss = false) 
   ctx.fill();
   furPath(ctx, hx + 0.02 * s, hy - 0.14 * s, 0.17 * s, 0.07 * s, 7, 0.3, 1);
   fillStroke(ctx, dark, lw);
+  if (rank >= 1) {
+    // a bone helmet
+    ctx.beginPath();
+    ctx.arc(hx + 0.02 * s, hy - 0.08 * s, 0.2 * s, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.closePath();
+    fillStroke(ctx, BONE, lw);
+    ctx.fillStyle = OUTLINE;
+    circle(ctx, hx + 0.02 * s, hy - 0.2 * s, 0.025 * s);
+    ctx.fill();
+  }
   if (boss) {
     ctx.save();
     ctx.translate(hx - 0.02 * s, hy - 0.2 * s);

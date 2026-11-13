@@ -3,7 +3,9 @@ import { ERAS } from './data/eras';
 import { GAME } from './data/game';
 import { runOptions } from './data/metaUpgrades';
 import { towerDef, upgradeCost } from './data/towers';
-import { WAVES } from './data/waves';
+import { enemyDef } from './data/enemies';
+import { WAVES, buildWave, hpScale, rankFor } from './data/waves';
+import { createRng } from './rng';
 import { posAt } from './path';
 import { bestSpot } from './playtest/bot';
 import * as sim from './run';
@@ -92,6 +94,7 @@ describe('targeting', () => {
         type: 'caveman',
         boss: false,
         tier: 0,
+        rank: 0,
         hp,
         maxHp: hp,
         speed: 0,
@@ -211,5 +214,21 @@ describe('getting through', () => {
     playUntil(b, 3);
     expect(a.kills).toBe(b.kills);
     expect(a.gold).toBe(b.gold);
+  });
+});
+
+describe('waves stay in your era', () => {
+  it('never sends enemies from a later era, but they level up and keep getting tougher', () => {
+    const rng = createRng(3);
+    for (let era = 0; era < ERAS.length; era++) {
+      for (let n = 1; n <= 40; n++) {
+        for (const s of buildWave(n, rng, era).spawns)
+          expect(enemyDef(s.id).tier).toBeLessThanOrEqual(era);
+      }
+    }
+    expect(rankFor(5, 0)).toBe(0);
+    expect(rankFor(6, 0)).toBe(1);
+    expect(rankFor(16, 0)).toBe(3);
+    expect(hpScale(20, 0)).toBeGreaterThan(hpScale(10, 0) * 3);
   });
 });
