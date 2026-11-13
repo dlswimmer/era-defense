@@ -5,13 +5,12 @@ import type { PreparedMap } from './sim/path';
 
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
-/** Sizes the canvas to the biggest whole-pixel tile that fits its parent. Returns the tile size. */
+/** Sizes the canvas to the biggest tile that fits its parent. Returns the tile size. */
 export function fitCanvas(canvas: HTMLCanvasElement, cols: number, rows: number): number {
   const stage = canvas.parentElement!;
-  const tile = Math.max(
-    16,
-    Math.floor(Math.min(stage.clientWidth / cols, stage.clientHeight / rows)),
-  );
+  // Quarter-pixel steps: as big as fits, without blurry odd sizes.
+  const fit = Math.min(stage.clientWidth / cols, stage.clientHeight / rows);
+  const tile = Math.max(16, Math.floor(fit * 4) / 4);
   const dpr = window.devicePixelRatio || 1;
   canvas.style.width = `${tile * cols}px`;
   canvas.style.height = `${tile * rows}px`;

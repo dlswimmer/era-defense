@@ -131,7 +131,7 @@ body {
 }
 .context {
   margin-top: 6px;
-  height: 136px; /* fixed so the map doesn't jump when the panel changes */
+  height: 118px; /* fixed so the map doesn't jump when the panel changes */
   overflow-y: auto;
 }
 .hint {
@@ -189,6 +189,22 @@ body {
 .info .credit {
   color: var(--gold);
   font-size: 12px;
+}
+.aim {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.aim .btn {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 2px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.aim .btn.on {
+  background: var(--gold);
+  color: #2a2000;
 }
 .info-actions {
   display: flex;
