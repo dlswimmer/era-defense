@@ -7,14 +7,14 @@ import { MAPS } from './data/maps';
 import type { RunOptions } from './data/metaUpgrades';
 import { towerDef, upgradeCost, sellValue, type TowerId } from './data/towers';
 import { buildWave, hpScale, WAVES, type Spawn } from './data/waves';
-import { cellKey, posAt, prepareMap, type Point, type PreparedMap } from './path';
+import { distToTrail, posAt, prepareMap, type Point, type PreparedMap } from './path';
 import { createRng, type Rng } from './rng';
 
 export interface Tower {
   id: number;
   type: TowerId;
-  col: number;
-  row: number;
+  x: number;
+  y: number;
   level: number; // 0, 1 or 2
   spent: number;
   cooldown: number;
@@ -48,7 +48,7 @@ export interface Shot {
 /** Things that happened this step, for the screen to show (popups, beams, shakes). */
 export type SimEvent =
   | { type: 'kill'; x: number; y: number; gold: number; chest: number; boss: boolean }
-  | { type: 'leak'; x: number; y: number; dmg: number }
+  | { type: 'leak'; x: number; y: number }
   | { type: 'beam'; tower: TowerId; points: Point[] }
   | { type: 'splash'; x: number; y: number; radius: number }
   | { type: 'waveStart'; wave: number; boss: boolean; bonus: number }
@@ -70,8 +70,7 @@ export interface Run {
   enemies: Enemy[];
   towers: Tower[];
   shots: Shot[];
-  wallHp: number;
-  wallMax: number;
+  damageBonus: number; // multiplies all tower damage (Relic upgrades)
   kills: number;
   bosses: number;
   time: number;
@@ -80,7 +79,7 @@ export interface Run {
   events: SimEvent[];
 }
 
-const DEFAULT_OPTIONS: RunOptions = { era: 0, bonusGold: 0, bonusWall: 0 };
+const DEFAULT_OPTIONS: RunOptions = { era: 0, bonusGold: 0, bonusDamage: 0 };
 
 export function createRun(
   seed = Date.now(),
@@ -89,7 +88,6 @@ export function createRun(
 ): Run {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const era = ERAS[opts.era]!;
-  const wall = era.wallHp + opts.bonusWall;
   // Later eras skip ahead so the first waves aren't a snooze: start one enemy tier below your era.
   const firstWave = Math.max(0, opts.era - 1) * WAVES.tierEvery;
   return {
@@ -108,8 +106,7 @@ export function createRun(
     enemies: [],
     towers: [],
     shots: [],
-    wallHp: wall,
-    wallMax: wall,
+    damageBonus: 1 + opts.bonusDamage,
     kills: 0,
     bosses: 0,
     time: 0,
@@ -121,33 +118,47 @@ export function createRun(
 
 // ---------- Player actions ----------
 
-export function towerAt(run: Run, col: number, row: number): Tower | undefined {
-  return run.towers.find((t) => t.col === col && t.row === row);
+/** The tower whose footprint covers (x, y), if any. `slop` widens it for fat fingers. */
+export function towerAt(run: Run, x: number, y: number, slop = 0): Tower | undefined {
+  let best: Tower | undefined;
+  let bestDist = GAME.towerRadius + slop;
+  for (const t of run.towers) {
+    const d = Math.hypot(t.x - x, t.y - y);
+    if (d <= bestDist) {
+      best = t;
+      bestDist = d;
+    }
+  }
+  return best;
 }
 
-export function isBuildable(run: Run, col: number, row: number): boolean {
+/** Can a tower stand at (x, y)? Not on the trail, a decoration, the base or another tower. */
+export function isBuildable(run: Run, x: number, y: number): boolean {
   const { map } = run;
-  if (col < 0 || row < 0 || col >= map.cols || row >= map.rows) return false;
-  const key = cellKey(col, row);
-  return !map.pathCells.has(key) && !map.decorCells.has(key) && !towerAt(run, col, row);
+  const r = GAME.towerRadius;
+  if (x < r || y < r || x > map.width - r || y > map.height - r) return false;
+  if (distToTrail(map, x, y) < map.pathWidth / 2 + r * 0.75) return false;
+  if (Math.hypot(x - map.base.x, y - map.base.y) < 0.9 + r) return false;
+  if (map.decor.some((p) => Math.hypot(p.x - x, p.y - y) < 0.35 + r)) return false;
+  return !run.towers.some((t) => Math.hypot(t.x - x, t.y - y) < r * 2);
 }
 
 export const isUnlocked = (run: Run, type: TowerId) => towerDef(type).era <= run.era;
 
-export function canBuild(run: Run, type: TowerId, col: number, row: number): boolean {
+export function canBuild(run: Run, type: TowerId, x: number, y: number): boolean {
   return (
     !run.breached &&
     isUnlocked(run, type) &&
     run.gold >= towerDef(type).cost &&
-    isBuildable(run, col, row)
+    isBuildable(run, x, y)
   );
 }
 
-export function build(run: Run, type: TowerId, col: number, row: number): Tower | null {
-  if (!canBuild(run, type, col, row)) return null;
+export function build(run: Run, type: TowerId, x: number, y: number): Tower | null {
+  if (!canBuild(run, type, x, y)) return null;
   const cost = towerDef(type).cost;
   run.gold -= cost;
-  const tower: Tower = { id: run.nextId++, type, col, row, level: 0, spent: cost, cooldown: 0 };
+  const tower: Tower = { id: run.nextId++, type, x, y, level: 0, spent: cost, cooldown: 0 };
   run.towers.push(tower);
   return tower;
 }
@@ -254,22 +265,13 @@ function moveEnemies(run: Run, dt: number) {
     const p = posAt(run.map, e.d);
     e.x = p.x;
     e.y = p.y;
-    if (e.d >= run.map.length) {
-      const dmg = e.boss
-        ? GAME.wallDamage.boss
-        : enemyDef(e.type).heavy
-          ? GAME.wallDamage.heavy
-          : GAME.wallDamage.normal;
-      run.wallHp = Math.max(0, run.wallHp - dmg);
-      e.hp = 0;
-      run.events.push({ type: 'leak', x: e.x, y: e.y, dmg });
+    if (e.d >= run.map.length && !run.breached) {
+      // No wall HP in Phase 1: the first enemy that reaches the base ends it (Last Stand next).
+      run.breached = true;
+      run.queue = [];
+      run.events.push({ type: 'leak', x: e.x, y: e.y });
+      run.events.push({ type: 'breach' });
     }
-  }
-  run.enemies = run.enemies.filter((e) => e.hp > 0);
-  if (run.wallHp <= 0) {
-    run.breached = true;
-    run.queue = [];
-    run.events.push({ type: 'breach' });
   }
 }
 
@@ -290,8 +292,8 @@ function fireTowers(run: Run, dt: number) {
     if (t.cooldown > 0) continue;
     const def = towerDef(t.type);
     const stats = def.levels[t.level]!;
-    const x = t.col + 0.5;
-    const y = t.row + 0.5;
+    const { x, y } = t;
+    const dmg = stats.dmg * run.damageBonus;
     const target = findTarget(run, x, y, stats.range);
     if (!target) {
       t.cooldown = 0;
@@ -305,13 +307,13 @@ function fireTowers(run: Run, dt: number) {
         targetId: target.id,
         tx: target.x,
         ty: target.y,
-        dmg: stats.dmg,
+        dmg,
         splash: def.splash ?? 0,
         speed: def.shot?.speed ?? 8,
         tower: t.type,
       });
     } else if (def.kind === 'beam') {
-      damage(run, target, stats.dmg);
+      damage(run, target, dmg);
       run.events.push({
         type: 'beam',
         tower: t.type,
@@ -328,7 +330,7 @@ function fireTowers(run: Run, dt: number) {
       for (let i = 0; i < (def.chain ?? 3) && cur; i++) {
         hit.add(cur);
         points.push({ x: cur.x, y: cur.y });
-        damage(run, cur, stats.dmg * Math.pow(0.8, i));
+        damage(run, cur, dmg * Math.pow(0.8, i));
         const from: Enemy = cur;
         cur = undefined;
         let bestDist = 1.6;

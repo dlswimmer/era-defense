@@ -2,7 +2,7 @@
 // read its level in `runOptions` below.
 import { ERAS } from './eras';
 
-export type MetaUpgradeId = 'era' | 'gold' | 'wall';
+export type MetaUpgradeId = 'era' | 'gold' | 'power';
 
 export interface MetaUpgrade {
   id: MetaUpgradeId;
@@ -33,10 +33,10 @@ export const META_UPGRADES: MetaUpgrade[] = [
     costs: [3, 6, 10, 16, 24],
   },
   {
-    id: 'wall',
-    name: 'Thick Walls',
-    emoji: '🧱',
-    describe: () => '+3 wall HP',
+    id: 'power',
+    name: 'Strong Arms',
+    emoji: '💪',
+    describe: () => '+10% damage for every tower',
     costs: [3, 6, 10, 16, 24],
   },
 ];
@@ -46,14 +46,14 @@ export type UpgradeLevels = Partial<Record<MetaUpgradeId, number>>;
 export interface RunOptions {
   era: number;
   bonusGold: number;
-  bonusWall: number;
+  bonusDamage: number; // 0.1 = +10% tower damage
 }
 
 export function runOptions(levels: UpgradeLevels): RunOptions {
   return {
     era: Math.min(ERAS.length - 1, levels.era ?? 0),
     bonusGold: 25 * (levels.gold ?? 0),
-    bonusWall: 3 * (levels.wall ?? 0),
+    bonusDamage: 0.1 * (levels.power ?? 0),
   };
 }
 

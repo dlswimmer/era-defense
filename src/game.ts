@@ -5,7 +5,11 @@ export interface Scene {
   exit?(): void;
   update?(dt: number): void;
   draw?(): void;
-  onTap?(x: number, y: number): void;
+  /** Pointer pressed on the canvas (x, y in canvas CSS pixels). */
+  onTap?(x: number, y: number, pointerType: string): void;
+  /** Pointer moved or released anywhere on the page, in canvas CSS pixels (may be outside it). */
+  onPointerMove?(x: number, y: number, pointerType: string): void;
+  onPointerUp?(x: number, y: number, pointerType: string, cancelled: boolean): void;
   onResize?(): void;
 }
 

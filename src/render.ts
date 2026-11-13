@@ -1,6 +1,7 @@
 // Canvas drawing helpers. Everything is drawn in CSS pixels; fitCanvas sets up device-pixel scaling.
 import type { Era } from './sim/data/eras';
-import { cellKey, type PreparedMap } from './sim/path';
+import { createRng } from './sim/rng';
+import type { PreparedMap } from './sim/path';
 
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
@@ -66,39 +67,148 @@ export function hpBar(
   ctx.fillRect(x - w / 2, y, w * Math.max(0, frac), h);
 }
 
-/** Grass, path, decorations and the base at the end of the path. */
-export function drawMap(
-  ctx: CanvasRenderingContext2D,
-  map: PreparedMap,
-  era: Era,
-  tile: number,
-  wallFrac = 1,
-) {
-  for (let r = 0; r < map.rows; r++) {
-    for (let c = 0; c < map.cols; c++) {
-      const key = cellKey(c, r);
-      ctx.fillStyle = map.pathCells.has(key) ? era.path : (c + r) % 2 ? era.ground : era.ground2;
-      ctx.fillRect(c * tile, r * tile, tile, tile);
-    }
-  }
-  // Soft edge along the path so it reads as a road.
-  ctx.strokeStyle = 'rgba(0,0,0,.12)';
-  ctx.lineWidth = tile * 0.08;
-  ctx.lineJoin = 'round';
+/** Mixes a #rrggbb color toward black (amount < 0) or white (amount > 0). */
+export function shade(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const target = amount < 0 ? 0 : 255;
+  const a = Math.abs(amount);
+  const mix = (c: number) => Math.round(c + (target - c) * a);
+  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+}
+
+function tracePath(ctx: CanvasRenderingContext2D, map: PreparedMap, tile: number) {
   ctx.beginPath();
   map.points.forEach((p, i) =>
     i ? ctx.lineTo(p.x * tile, p.y * tile) : ctx.moveTo(p.x * tile, p.y * tile),
   );
+}
+
+/** Grass, the dirt trail and decorations. Drawn once per map/era/size and then reused. */
+function renderGround(map: PreparedMap, era: Era, tile: number, dpr: number): HTMLCanvasElement {
+  const w = map.width * tile;
+  const h = map.height * tile;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  const ctx = canvas.getContext('2d')!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const rng = createRng(7); // same scenery every time
+
+  // Grass: base color, soft patches, then little tufts and flowers.
+  ctx.fillStyle = era.ground;
+  ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 70; i++) {
+    ctx.fillStyle = i % 2 ? era.ground2 : shade(era.ground, 0.06);
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.ellipse(
+      rng.next() * w,
+      rng.next() * h,
+      tile * (0.5 + rng.next() * 1.2),
+      tile * (0.3 + rng.next() * 0.7),
+      rng.next() * Math.PI,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = shade(era.ground, -0.22);
+  ctx.lineWidth = Math.max(1, tile * 0.035);
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 260; i++) {
+    const x = rng.next() * w;
+    const y = rng.next() * h;
+    const s = tile * (0.06 + rng.next() * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(x - s, y - s * 1.2);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + s * 0.2, y - s * 1.6);
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + s, y - s * 1.1);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 40; i++) {
+    ctx.fillStyle = rng.pick(['#fff6d5', '#ffe066', '#ffb3c7']);
+    ctx.beginPath();
+    ctx.arc(rng.next() * w, rng.next() * h, tile * 0.045, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // The trail: a soft shadow, a darker rim, the dirt, and a worn lighter middle.
+  const pw = map.pathWidth * tile;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.save();
+  ctx.translate(0, tile * 0.06);
+  tracePath(ctx, map, tile);
+  ctx.strokeStyle = 'rgba(0,0,0,.18)';
+  ctx.lineWidth = pw + tile * 0.22;
   ctx.stroke();
+  ctx.restore();
+  tracePath(ctx, map, tile);
+  ctx.strokeStyle = shade(era.path, -0.28);
+  ctx.lineWidth = pw + tile * 0.14;
+  ctx.stroke();
+  ctx.strokeStyle = era.path;
+  ctx.lineWidth = pw;
+  ctx.stroke();
+  ctx.strokeStyle = shade(era.path, 0.12);
+  ctx.lineWidth = pw * 0.45;
+  ctx.globalAlpha = 0.55;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // Pebbles scattered along the trail.
+  for (let i = 0; i < 90; i++) {
+    const p = map.points[Math.floor(rng.next() * map.points.length)]!;
+    const a = rng.next() * Math.PI * 2;
+    const r = rng.next() * map.pathWidth * 0.42;
+    ctx.fillStyle = shade(era.path, rng.next() < 0.5 ? -0.2 : -0.35);
+    ctx.beginPath();
+    ctx.ellipse(
+      (p.x + Math.cos(a) * r) * tile,
+      (p.y + Math.sin(a) * r) * tile,
+      tile * (0.03 + rng.next() * 0.04),
+      tile * (0.025 + rng.next() * 0.03),
+      rng.next() * Math.PI,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
 
-  map.def.decor.forEach(([c, r], i) => {
-    emoji(ctx, era.decor[i % era.decor.length]!, (c + 0.5) * tile, (r + 0.5) * tile, tile * 0.6);
+  // A dirt clearing around the base.
+  ctx.fillStyle = shade(era.path, -0.28);
+  ctx.beginPath();
+  ctx.arc(map.base.x * tile, map.base.y * tile, tile * 0.78, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = era.path;
+  ctx.beginPath();
+  ctx.arc(map.base.x * tile, map.base.y * tile, tile * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+
+  map.decor.forEach((p, i) => {
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.beginPath();
+    ctx.ellipse(p.x * tile, (p.y + 0.25) * tile, tile * 0.3, tile * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    emoji(ctx, era.decor[i % era.decor.length]!, p.x * tile, p.y * tile, tile * 0.7);
   });
+  return canvas;
+}
 
-  // Base and outer wall.
-  const bx = (map.base.col + 0.5) * tile;
-  const by = (map.base.row + 0.5) * tile;
-  ctx.fillStyle = wallFrac > 0.5 ? '#8a8f98' : wallFrac > 0.25 ? '#a07b5a' : '#a0504a';
-  ctx.fillRect(bx - tile * 1.5, by - tile * 0.55, tile * 3, tile * 0.18);
-  emoji(ctx, era.base, bx, by + tile * 0.08, tile * 0.85);
+const groundCache = new Map<string, HTMLCanvasElement>();
+
+/** Grass, trail, decorations and the base at the end of the trail. */
+export function drawMap(ctx: CanvasRenderingContext2D, map: PreparedMap, era: Era, tile: number) {
+  const dpr = window.devicePixelRatio || 1;
+  const key = `${map.def.name}|${era.id}|${tile}|${dpr}`;
+  let ground = groundCache.get(key);
+  if (!ground) {
+    if (groundCache.size > 8) groundCache.clear();
+    ground = renderGround(map, era, tile, dpr);
+    groundCache.set(key, ground);
+  }
+  ctx.drawImage(ground, 0, 0, map.width * tile, map.height * tile);
+  emoji(ctx, era.base, map.base.x * tile, map.base.y * tile, tile * 1.0);
 }

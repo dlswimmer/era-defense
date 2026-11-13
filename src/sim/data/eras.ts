@@ -3,7 +3,7 @@
 // highest era you have unlocked.
 //   relicCost: Relics needed to evolve INTO this era
 //   startGold: gold at the start of a run in this era (later towers cost more)
-//   wallHp:    the outer wall's HP in this era
+//   wallHp:    the wall's HP in this era (for the Last Stand; Phase 1 ends on the first leak)
 export interface Era {
   id: string;
   name: string;

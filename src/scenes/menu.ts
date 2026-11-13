@@ -20,7 +20,11 @@ export function createMenuScene(game: Game): Scene {
         { class: 'card' },
         el('div', { class: 'emoji-row' }, '🪨🏹🎯💣🚀⚡'),
         el('h1', {}, 'Era Defense'),
-        el('p', {}, 'Build towers. Hold the wall. Earn Relics to evolve from rocks to lasers!'),
+        el(
+          'p',
+          {},
+          "Build towers. Don't let anyone through. Earn Relics to evolve from rocks to lasers!",
+        ),
         best.wave
           ? el(
               'p',
@@ -42,7 +46,7 @@ export function createMenuScene(game: Game): Scene {
         el(
           'p',
           { style: 'font-size:13px;margin-top:16px' },
-          'Tap a grass square to build. Stop enemies to earn 💰 gold. When the wall falls you get 🦴 Relics: spend them to Evolve and unlock new towers!',
+          'Drag a tower onto the grass to build. Stop enemies to earn 💰 gold. When one gets through, the run ends and you get 🦴 Relics: spend them to Evolve and unlock new towers!',
         ),
       ),
     );
@@ -59,7 +63,7 @@ export function createMenuScene(game: Game): Scene {
       hideOverlay();
     },
     onResize() {
-      tile = fitCanvas(game.canvas, map.cols, map.rows);
+      tile = fitCanvas(game.canvas, map.width, map.height);
     },
     update(dt) {
       // Cycle the background through the eras for a bit of life.

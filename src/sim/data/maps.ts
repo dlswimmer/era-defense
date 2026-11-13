@@ -1,39 +1,50 @@
-// Maps. `path` is a list of grid waypoints [col, row]; enemies walk between them in straight lines.
-// The first point can be off the grid (enemies walk in from outside). The last point is the base.
+// Maps. Positions are in world units ("tiles"): the map is `width` × `height` of them, and
+// tower ranges and enemy speeds use the same unit.
+//   trail: control points the enemies' trail is smoothed through (a curve, not straight lines).
+//          The first point can be off the map (enemies walk in). The last point is the base.
+//   pathWidth: how wide the trail is. Towers can't be placed on it.
+//   decor: [x, y] spots for trees, rocks and so on. Towers can't go on them either.
 export interface MapDef {
   name: string;
-  cols: number;
-  rows: number;
-  path: [number, number][];
+  width: number;
+  height: number;
+  pathWidth: number;
+  trail: [number, number][];
   decor: [number, number][];
 }
 
 export const MAPS: Record<string, MapDef> = {
   meadow: {
     name: 'Meadow',
-    cols: 10,
-    rows: 13,
-    path: [
-      [1, -1],
-      [1, 2],
-      [8, 2],
-      [8, 5],
-      [1, 5],
-      [1, 8],
-      [8, 8],
-      [8, 10],
-      [4, 10],
-      [4, 12],
+    width: 10,
+    height: 13,
+    pathWidth: 0.85,
+    trail: [
+      [2.2, -1],
+      [2.0, 1.4],
+      [3.6, 2.6],
+      [6.6, 1.6],
+      [8.4, 3.0],
+      [7.4, 5.0],
+      [4.4, 4.6],
+      [1.6, 5.6],
+      [1.8, 8.0],
+      [4.6, 8.6],
+      [7.4, 7.6],
+      [8.6, 9.6],
+      [7.2, 11.2],
+      [5.0, 11.0],
+      [3.6, 12.0],
     ],
-    // A few cells with decorations (not buildable). Purely for looks.
     decor: [
-      [0, 0],
-      [9, 0],
-      [4, 0],
-      [9, 12],
-      [0, 12],
-      [9, 6],
-      [0, 10],
+      [0.6, 0.6],
+      [9.3, 0.6],
+      [5.2, 0.7],
+      [9.3, 12.3],
+      [0.6, 9.9],
+      [9.4, 6.6],
+      [4.9, 6.6],
+      [0.6, 12.3],
     ],
   },
 };

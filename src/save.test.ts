@@ -21,4 +21,9 @@ describe('migrate', () => {
     expect(m.upgrades).toEqual({});
     expect(m.version).toBe(SAVE_VERSION);
   });
+
+  it('turns old Thick Walls levels into Strong Arms', () => {
+    const m = migrate({ version: 2, upgrades: { era: 1, wall: 2 } });
+    expect(m.upgrades).toEqual({ era: 1, power: 2 });
+  });
 });

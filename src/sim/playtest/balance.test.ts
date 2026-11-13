@@ -20,12 +20,14 @@ describe('balance', () => {
     for (const r of stone) expect(r.relics).toBeGreaterThanOrEqual(ERAS[1]!.relicCost);
   });
 
-  it('every era lasts longer than the Stone Age, and the wall always falls', () => {
-    const stoneTime = Math.max(...stone.map((r) => r.time));
+  // Phase 1 ends on the first leak, so every era stays a short run. Harder maps will keep it
+  // that way once players have strong upgrades (David doesn't want 20-minute Phase 1s).
+  it('every era is a short run that still lets you play a while, and someone always gets through', () => {
     for (let era = 1; era < ERAS.length; era++) {
       const r = playRun(seeds[0]!, { era });
-      expect(r.time).toBeGreaterThan(stoneTime);
-      expect(r.time).toBeLessThan(10 * 60);
+      expect(r.time).toBeGreaterThan(60);
+      expect(r.time).toBeLessThan(5 * 60);
+      expect(r.held).toBeGreaterThanOrEqual(3);
     }
   });
 });

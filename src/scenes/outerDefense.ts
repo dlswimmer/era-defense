@@ -1,6 +1,6 @@
 // Phase 1: Outer Defense. Draws the run and turns taps into sim actions (src/sim/run.ts).
 import type { Game, RunSummary, Scene } from '../game';
-import { emoji, fitCanvas, hpBar, drawMap, text } from '../render';
+import { emoji, fitCanvas, hpBar, drawMap, shade, text } from '../render';
 import { saveMeta } from '../save';
 import { ERAS } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
@@ -34,11 +34,23 @@ interface Ring {
 }
 
 const BREACH_TIME = 2.6;
+/** On touch screens the tower being placed floats this far (in tiles) above the finger. */
+const TOUCH_LIFT = 1.1;
+
+/** A tower picked from the shop that is being dragged onto the map. */
+interface Placing {
+  type: TowerId;
+  x: number;
+  y: number;
+  show: boolean; // is the ghost over the map?
+  dragging: boolean; // is a finger or button held down?
+}
 
 export function createOuterDefenseScene(game: Game): Scene {
   let run: sim.Run;
   let tile = 32;
-  let selected: { col: number; row: number } | null = null;
+  let selected: sim.Tower | null = null;
+  let placing: Placing | null = null;
   let speed = 1;
   let paused = false;
   let popups: Popup[] = [];
@@ -54,20 +66,10 @@ export function createOuterDefenseScene(game: Game): Scene {
     chest: el('span', { class: 'hud-chip' }),
     wave: el('span', { class: 'hud-chip' }),
     era: el('span', { class: 'hud-chip era' }),
-    wallText: el('span'),
-    wallFill: el('div', { class: 'wall-fill' }),
   };
   const buildHud = () => {
     $('hud').replaceChildren(
-      el('div', { class: 'hud-row' }, hud.gold, hud.chest, hud.wave, hud.era),
-      el(
-        'div',
-        { class: 'wall-row' },
-        el('span', {}, '🧱 Wall'),
-        el('div', { class: 'wall-bar' }, hud.wallFill),
-        hud.wallText,
-        ctl.idea,
-      ),
+      el('div', { class: 'hud-row' }, hud.gold, hud.chest, hud.wave, hud.era, ctl.idea),
     );
   };
   const updateHud = () => {
@@ -76,12 +78,6 @@ export function createOuterDefenseScene(game: Game): Scene {
     setText(hud.chest, `⚔️ ${run.chest}`);
     setText(hud.wave, `🌊 ${run.wave}`);
     setText(hud.era, `${era.base} ${era.name}`);
-    setText(hud.wallText, `${run.wallHp}/${run.wallMax}`);
-    const frac = run.wallHp / run.wallMax;
-    const width = `${Math.round(frac * 100)}%`;
-    if (hud.wallFill.style.width !== width) hud.wallFill.style.width = width;
-    hud.wallFill.classList.toggle('mid', frac <= 0.5 && frac > 0.25);
-    hud.wallFill.classList.toggle('low', frac <= 0.25);
   };
 
   // ---------- Panel ----------
@@ -108,13 +104,8 @@ export function createOuterDefenseScene(game: Game): Scene {
 
   const renderContext = () => {
     costButtons = [];
-    const tower = selected && sim.towerAt(run, selected.col, selected.row);
-    if (tower) context.replaceChildren(towerInfo(tower));
-    else if (selected) context.replaceChildren(shop());
-    else
-      context.replaceChildren(
-        el('div', { class: 'hint' }, '👆 Tap a grass square to build a tower'),
-      );
+    if (selected) context.replaceChildren(towerInfo(selected));
+    else context.replaceChildren(shop());
   };
 
   const shop = () => {
@@ -125,7 +116,10 @@ export function createOuterDefenseScene(game: Game): Scene {
       const locked = def.era > run.era;
       const btn = el(
         'button',
-        { class: `btn${locked ? ' locked' : ''}`, onclick: () => onBuild(id) },
+        {
+          class: `btn${locked ? ' locked' : ''}${placing?.type === id ? ' picked' : ''}`,
+          onpointerdown: (e: Event) => onPickTower(id, e),
+        },
         el('span', { class: 'em' }, locked ? '🔒' : def.emoji),
         el('span', { class: 'nm' }, def.name),
         el('span', { class: 'cost' }, locked ? '🦴 Evolve' : `💰${def.cost}`),
@@ -214,25 +208,87 @@ export function createOuterDefenseScene(game: Game): Scene {
     paused = true;
     openIdeaBox(game, () => (paused = wasPaused));
   };
-  const onBuild = (id: TowerId) => {
-    if (!selected) return;
-    if (sim.build(run, id, selected.col, selected.row)) renderContext();
+  /** Pressing a shop button picks that tower up; press it again to put it back. */
+  const onPickTower = (id: TowerId, e: Event) => {
+    e.preventDefault();
+    // Let the drag move over the map instead of sticking to this button (touch captures it).
+    const pe = e as PointerEvent;
+    const target = e.currentTarget as Element | null;
+    if (target?.hasPointerCapture?.(pe.pointerId)) target.releasePointerCapture(pe.pointerId);
+    if (run.breached) return;
+    banner = null;
+    if (placing?.type === id) placing = null;
+    else if (run.gold >= towerDef(id).cost) {
+      placing = { type: id, x: 0, y: 0, show: false, dragging: true };
+      selected = null;
+    }
+    renderContext();
+  };
+  const cancelPlacing = () => {
+    if (!placing) return;
+    placing = null;
+    renderContext();
+  };
+  /** Moves the ghost tower to a pointer position, lifting it above a finger so it stays visible. */
+  const moveGhost = (px: number, py: number, pointerType: string) => {
+    if (!placing) return;
+    const w = run.map.width * tile;
+    const h = run.map.height * tile;
+    placing.show = px >= 0 && py >= 0 && px <= w && py <= h;
+    placing.x = px / tile;
+    placing.y = py / tile - (pointerType === 'mouse' ? 0 : TOUCH_LIFT);
+  };
+  const tryPlace = () => {
+    if (!placing) return;
+    const { type, x, y } = placing;
+    if (sim.build(run, type, x, y)) {
+      placing = null;
+      renderContext();
+    } else {
+      addPopup(
+        x,
+        y - 0.5,
+        run.gold < towerDef(type).cost ? 'Need 💰' : "Can't go there",
+        '#ff8a8a',
+      );
+    }
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') cancelPlacing();
   };
   const onUpgrade = (tower: sim.Tower) => {
     if (sim.upgrade(run, tower)) renderContext();
   };
   const onSell = (tower: sim.Tower) => {
     const value = sim.sell(run, tower);
-    addPopup(tower.col + 0.5, tower.row + 0.5, `+${value}💰`, '#ffd34d');
+    addPopup(tower.x, tower.y, `+${value}💰`, '#ffd34d');
     selected = null;
     renderContext();
   };
 
-  const select = (col: number, row: number) => {
-    const same = selected && selected.col === col && selected.row === row;
-    if (same || (!sim.towerAt(run, col, row) && !sim.isBuildable(run, col, row))) selected = null;
-    else selected = { col, row };
+  const select = (x: number, y: number, pointerType: string) => {
+    const tower = sim.towerAt(run, x, y, pointerType === 'mouse' ? 0.05 : 0.3);
+    selected = tower && tower !== selected ? tower : null;
     renderContext();
+  };
+
+  const towerRange = (t: sim.Tower) => towerDef(t.type).levels[t.level]!.range;
+  const rangeCircle = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    range: number,
+    ok: boolean,
+  ) => {
+    ctx.fillStyle = ok ? 'rgba(255,255,255,.16)' : 'rgba(255,60,60,.18)';
+    ctx.strokeStyle = ok ? 'rgba(255,255,255,.75)' : 'rgba(255,80,80,.85)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.arc(x * tile, y * tile, range * tile, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
   };
 
   // ---------- Effects ----------
@@ -251,7 +307,7 @@ export function createOuterDefenseScene(game: Game): Scene {
           }
           break;
         case 'leak':
-          addPopup(ev.x, ev.y - 0.6, `-${ev.dmg}🧱`, '#ff5d5d', 0.38);
+          addPopup(ev.x, ev.y - 0.6, '😱', '#ff5d5d', 0.6);
           shake = Math.max(shake, 0.25);
           break;
         case 'beam': {
@@ -276,6 +332,7 @@ export function createOuterDefenseScene(game: Game): Scene {
           breachTimer = 0;
           shake = 1;
           selected = null;
+          placing = null;
           renderContext();
           break;
       }
@@ -316,6 +373,7 @@ export function createOuterDefenseScene(game: Game): Scene {
       // Add ?dev to the URL for lots of gold (handy for testing new towers).
       if (new URLSearchParams(location.search).has('dev')) run.gold = 99_999;
       selected = null;
+      placing = null;
       speed = 1;
       paused = false;
       popups = [];
@@ -323,7 +381,7 @@ export function createOuterDefenseScene(game: Game): Scene {
       rings = [];
       shake = 0;
       breachTimer = -1;
-      banner = { text: 'Build towers, then tap ▶ Start', t: -1.5 };
+      banner = { text: 'Drag a tower onto the grass', t: -1.5 };
       buildHud();
       buildPanel();
       $('hud').hidden = false;
@@ -331,16 +389,34 @@ export function createOuterDefenseScene(game: Game): Scene {
       renderContext();
       this.onResize!();
       document.addEventListener('visibilitychange', onVisibility);
+      window.addEventListener('keydown', onKey);
     },
     exit() {
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('keydown', onKey);
     },
     onResize() {
-      tile = fitCanvas(game.canvas, run.map.cols, run.map.rows);
+      tile = fitCanvas(game.canvas, run.map.width, run.map.height);
     },
-    onTap(x, y) {
+    onTap(px, py, pointerType) {
       if (run.breached) return;
-      select(Math.floor(x / tile), Math.floor(y / tile));
+      if (placing) {
+        placing.dragging = true;
+        moveGhost(px, py, pointerType);
+      } else select(px / tile, py / tile, pointerType);
+    },
+    onPointerMove(px, py, pointerType) {
+      // A mouse can hover the ghost around; a finger has to be down.
+      if (placing && (placing.dragging || pointerType === 'mouse')) moveGhost(px, py, pointerType);
+    },
+    onPointerUp(px, py, pointerType, cancelled) {
+      if (!placing?.dragging) return;
+      placing.dragging = false;
+      if (cancelled) placing.show = false;
+      else {
+        moveGhost(px, py, pointerType);
+        if (placing.show) tryPlace();
+      }
     },
     update(dt) {
       if (breachTimer >= 0) {
@@ -369,53 +445,50 @@ export function createOuterDefenseScene(game: Game): Scene {
     draw() {
       const ctx = game.ctx;
       const era = ERAS[run.era]!;
-      const w = run.map.cols * tile;
-      const h = run.map.rows * tile;
+      const w = run.map.width * tile;
+      const h = run.map.height * tile;
       ctx.save();
       if (shake > 0) {
         const s = shake * tile * 0.15;
         ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
       }
-      drawMap(ctx, run.map, era, tile, run.wallHp / run.wallMax);
+      drawMap(ctx, run.map, era, tile);
 
-      // Selection + range
-      if (selected) {
-        const tower = sim.towerAt(run, selected.col, selected.row);
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(selected.col * tile + 2, selected.row * tile + 2, tile - 4, tile - 4);
-        if (tower) {
-          const range = towerDef(tower.type).levels[tower.level]!.range;
-          ctx.fillStyle = 'rgba(255,255,255,.15)';
-          ctx.strokeStyle = 'rgba(255,255,255,.6)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc((tower.col + 0.5) * tile, (tower.row + 0.5) * tile, range * tile, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-        }
-      }
+      // Selected tower's range
+      if (selected) rangeCircle(ctx, selected.x, selected.y, towerRange(selected), true);
 
-      // Towers
-      for (const t of run.towers) {
-        const cx = (t.col + 0.5) * tile;
-        const cy = (t.row + 0.5) * tile;
-        ctx.fillStyle = 'rgba(0,0,0,.18)';
+      // Towers, sorted by y so lower ones overlap higher ones.
+      const pad = shade(era.path, -0.18);
+      for (const t of [...run.towers].sort((a, b) => a.y - b.y)) {
+        const cx = t.x * tile;
+        const cy = t.y * tile;
+        const r = GAME.towerRadius * tile;
+        ctx.fillStyle = 'rgba(0,0,0,.22)';
         ctx.beginPath();
-        ctx.ellipse(cx, cy + tile * 0.3, tile * 0.36, tile * 0.12, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx, cy + r * 0.55, r * 0.95, r * 0.42, 0, 0, Math.PI * 2);
         ctx.fill();
-        emoji(ctx, towerDef(t.type).emoji, cx, cy, tile * 0.7);
+        ctx.fillStyle = pad;
+        ctx.strokeStyle = t === selected ? '#fff' : 'rgba(0,0,0,.35)';
+        ctx.lineWidth = t === selected ? 3 : 1.5;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + r * 0.35, r * 0.85, r * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        emoji(ctx, towerDef(t.type).emoji, cx, cy - r * 0.1, tile * 0.7);
         for (let i = 0; i <= t.level; i++) {
           ctx.fillStyle = '#ffd34d';
+          ctx.strokeStyle = 'rgba(0,0,0,.4)';
+          ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.arc(
             cx + (i - t.level / 2) * tile * 0.18,
-            cy + tile * 0.42,
-            tile * 0.07,
+            cy + r * 0.95,
+            tile * 0.065,
             0,
             Math.PI * 2,
           );
           ctx.fill();
+          ctx.stroke();
         }
       }
 
@@ -470,7 +543,32 @@ export function createOuterDefenseScene(game: Game): Scene {
         text(ctx, p.text, p.x * tile, (p.y - p.t * 0.6) * tile, tile * p.size, p.color);
       }
       ctx.globalAlpha = 1;
+
+      // The tower being placed, with its range: white where it fits, red where it doesn't.
+      if (placing?.show) {
+        const ok = sim.canBuild(run, placing.type, placing.x, placing.y);
+        const def = towerDef(placing.type);
+        rangeCircle(ctx, placing.x, placing.y, def.levels[0].range, ok);
+        ctx.fillStyle = ok ? 'rgba(255,255,255,.35)' : 'rgba(255,60,60,.45)';
+        ctx.beginPath();
+        ctx.arc(placing.x * tile, placing.y * tile, GAME.towerRadius * tile, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.85;
+        emoji(ctx, def.emoji, placing.x * tile, placing.y * tile, tile * 0.7);
+        ctx.globalAlpha = 1;
+      }
       ctx.restore();
+
+      if (placing && !placing.show) {
+        text(
+          ctx,
+          `👆 Drag ${towerDef(placing.type).emoji} onto the grass`,
+          w / 2,
+          tile * 0.6,
+          tile * 0.42,
+          '#fff',
+        );
+      }
 
       // Banner
       if (banner && banner.t >= 0) {
@@ -489,8 +587,8 @@ export function createOuterDefenseScene(game: Game): Scene {
         ctx.fillStyle = `rgba(200,30,30,${Math.min(0.45, t * 0.6)})`;
         ctx.fillRect(0, 0, w, h);
         const pulse = 1 + Math.sin(t * 10) * 0.06;
-        text(ctx, '💥 BREACH! 💥', w / 2, h * 0.45, tile * 1.0 * pulse, '#fff');
-        if (t > 0.8) text(ctx, 'The wall is down!', w / 2, h * 0.56, tile * 0.45, '#ffd34d');
+        text(ctx, '🚨 They got through! 🚨', w / 2, h * 0.45, tile * 0.75 * pulse, '#fff');
+        if (t > 0.8) text(ctx, 'To the wall!', w / 2, h * 0.56, tile * 0.5, '#ffd34d');
       }
     },
   };

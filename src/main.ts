@@ -28,10 +28,19 @@ scenes.outer = createOuterDefenseScene(game);
 scenes.breach = createBreachScene(game);
 scenes.upgrades = createUpgradesScene(game);
 
-canvas.addEventListener('pointerdown', (e) => {
+const local = (e: PointerEvent): [number, number] => {
   const rect = canvas.getBoundingClientRect();
-  current?.onTap?.(e.clientX - rect.left, e.clientY - rect.top);
-});
+  return [e.clientX - rect.left, e.clientY - rect.top];
+};
+canvas.addEventListener('pointerdown', (e) => current?.onTap?.(...local(e), e.pointerType));
+// Moves and releases are watched on the whole page so a tower can be dragged from the shop.
+window.addEventListener('pointermove', (e) => current?.onPointerMove?.(...local(e), e.pointerType));
+window.addEventListener('pointerup', (e) =>
+  current?.onPointerUp?.(...local(e), e.pointerType, false),
+);
+window.addEventListener('pointercancel', (e) =>
+  current?.onPointerUp?.(...local(e), e.pointerType, true),
+);
 
 // The panel/HUD can change height, so watch the stage instead of just the window.
 new ResizeObserver(() => current?.onResize?.()).observe($('stage'));
