@@ -4,17 +4,16 @@ import { relicsEarned, type RunOptions } from '../data/metaUpgrades';
 import { posAt, type Point } from '../path';
 import * as sim from '../run';
 import { UNIT_IDS, unitDef } from '../data/units';
+import { BOOSTS, type Boost } from '../data/stand';
 import {
+  boostCost,
+  buyBoost,
+  canHire,
   createStand,
-  firstFreeSlot,
   hire,
-  isUnitUnlocked,
-  nextUnitCost,
-  promote,
   standRelics,
   standWavesHeld,
   stepStand,
-  type Defender,
   type Stand,
   type StandOptions,
 } from '../stand';
@@ -123,19 +122,19 @@ export function playRun(
   };
 }
 
-/** Spend the War Chest in the Last Stand: fill the wall with the best defender, then upgrade. */
+/** Spend the War Chest in the Last Stand: fill the wall with the best defender, then boosts. */
 export function spendStand(stand: Stand) {
   for (let guard = 0; guard < 50; guard++) {
-    const pick = UNIT_IDS.filter(
-      (id) => isUnitUnlocked(stand, id) && stand.chest >= unitDef(id).cost,
-    ).sort((a, b) => unitDef(b).cost - unitDef(a).cost)[0];
-    if (pick && firstFreeSlot(stand) >= 0 && hire(stand, pick)) continue;
-    const up = stand.slots
-      .filter((u): u is Defender => !!u)
-      .map((u) => ({ u, cost: nextUnitCost(u) }))
-      .filter((x): x is { u: Defender; cost: number } => x.cost !== null && x.cost <= stand.chest)
+    const pick = UNIT_IDS.filter((id) => canHire(stand, id)).sort(
+      (a, b) => unitDef(b).cost - unitDef(a).cost,
+    )[0];
+    if (pick && hire(stand, pick)) continue;
+    const hurt = stand.wallHp < stand.wallMax * 0.6;
+    const boost = BOOSTS.filter((b) => b.id !== 'repair' || hurt)
+      .map((b) => ({ b, cost: boostCost(stand, b) }))
+      .filter((x): x is { b: Boost; cost: number } => x.cost !== null && x.cost <= stand.chest)
       .sort((a, b) => a.cost - b.cost)[0];
-    if (up && promote(stand, up.u)) continue;
+    if (boost && buyBoost(stand, boost.b.id)) continue;
     return;
   }
 }

@@ -3,6 +3,7 @@
 // highest era you have unlocked.
 //   relicCost: Relics needed to evolve INTO this era
 //   startGold: gold at the start of a run in this era (later towers cost more)
+//   wall:      how the Last Stand wall looks
 //   wallHp:    the wall's HP in this era (for the Last Stand; Phase 1 ends on the first leak)
 export interface Era {
   id: string;
@@ -15,6 +16,13 @@ export interface Era {
   ground2: string;
   path: string;
   decor: string[];
+  /** How the Last Stand wall looks in this era. */
+  wall: WallStyle;
+}
+
+export interface WallStyle {
+  kind: 'logs' | 'blocks' | 'bricks' | 'concrete' | 'energy';
+  color: string;
 }
 
 export const ERAS: Era[] = [
@@ -29,6 +37,7 @@ export const ERAS: Era[] = [
     ground2: '#76ad4b',
     path: '#d8b97c',
     decor: ['🌿', '🪵', '🌳'],
+    wall: { kind: 'logs', color: '#8b5a2b' },
   },
   {
     id: 'ancient',
@@ -41,6 +50,7 @@ export const ERAS: Era[] = [
     ground2: '#9daf52',
     path: '#e3cf98',
     decor: ['🌾', '🏺', '🌳'],
+    wall: { kind: 'blocks', color: '#d9c08a' },
   },
   {
     id: 'medieval',
@@ -53,6 +63,7 @@ export const ERAS: Era[] = [
     ground2: '#589448',
     path: '#b7a07a',
     decor: ['🌲', '🍄', '🌲'],
+    wall: { kind: 'blocks', color: '#9a958c' },
   },
   {
     id: 'gunpowder',
@@ -65,6 +76,7 @@ export const ERAS: Era[] = [
     ground2: '#659263',
     path: '#c9b18a',
     decor: ['🌴', '🛢️', '⚓'],
+    wall: { kind: 'bricks', color: '#a8553a' },
   },
   {
     id: 'modern',
@@ -77,6 +89,7 @@ export const ERAS: Era[] = [
     ground2: '#688268',
     path: '#5b5f66',
     decor: ['🌳', '🚧', '🚗'],
+    wall: { kind: 'concrete', color: '#a7adb5' },
   },
   {
     id: 'future',
@@ -89,5 +102,6 @@ export const ERAS: Era[] = [
     ground2: '#354471',
     path: '#7dd3fc',
     decor: ['💠', '🔷', '✨'],
+    wall: { kind: 'energy', color: '#5fd4ff' },
   },
 ];

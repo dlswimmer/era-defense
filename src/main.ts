@@ -56,5 +56,11 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 
-game.go('menu');
+// ?stand=<era> jumps straight into a Last Stand (handy for testing walls and defenders).
+const standEra = new URLSearchParams(location.search).get('stand');
+if (standEra !== null) {
+  const era = Math.max(0, Math.min(5, Number(standEra) || 0));
+  const p1 = { wave: 5 + era * 5, era, chest: 60, kills: 0, bosses: 0, held: 0, time: 0 };
+  game.go('stand', { ...p1, relics: 0, newBest: false });
+} else game.go('menu');
 requestAnimationFrame(frame);
