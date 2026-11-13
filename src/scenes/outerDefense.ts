@@ -7,10 +7,10 @@ import { saveMeta } from '../save';
 import { ERAS } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
 import { GAME } from '../sim/data/game';
-import { relicsEarned, runOptions } from '../sim/data/metaUpgrades';
 import { TOWER_IDS, towerDef, sellValue, type TowerId } from '../sim/data/towers';
 import { posAt, type Point } from '../sim/path';
 import * as sim from '../sim/run';
+import { runOptions } from '../sim/web';
 import { openIdeaBox } from '../ui/ideas';
 import { $, el, setDisabled, setText } from '../ui/dom';
 
@@ -151,8 +151,8 @@ export function createOuterDefenseScene(game: Game): Scene {
 
   const towerInfo = (tower: sim.Tower) => {
     const def = towerDef(tower.type);
-    const stats = def.levels[tower.level]!;
-    const next = def.levels[tower.level + 1];
+    const stats = sim.towerStats(run, tower.type, tower.level);
+    const next = def.levels[tower.level + 1] && sim.towerStats(run, tower.type, tower.level + 1);
     const upCost = sim.nextUpgradeCost(tower);
     const upBtn = el(
       'button',
@@ -307,7 +307,7 @@ export function createOuterDefenseScene(game: Game): Scene {
     renderContext();
   };
 
-  const towerRange = (t: sim.Tower) => towerDef(t.type).levels[t.level]!.range;
+  const towerRange = (t: sim.Tower) => sim.towerStats(run, t.type, t.level).range;
   const rangeCircle = (
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -403,7 +403,7 @@ export function createOuterDefenseScene(game: Game): Scene {
 
   /** Throw progress for a tower's person: wind up just before a shot, follow through after. */
   const throwPose = (t: sim.Tower) => {
-    const stats = towerDef(t.type).levels[t.level]!;
+    const stats = sim.towerStats(run, t.type, t.level);
     const target = sim.findTarget(run, t.x, t.y, stats.range, t.targeting);
     if (target) facing.set(t.id, target.x >= t.x ? 1 : -1);
     const since = clock - (lastFire.get(t.id) ?? -99);
@@ -548,8 +548,8 @@ export function createOuterDefenseScene(game: Game): Scene {
     const { meta } = game;
     const newBest = run.wave > meta.best.wave;
     if (newBest) meta.best = { wave: run.wave, era: run.era, chest: run.chest };
-    const relics = relicsEarned(run);
-    meta.relics += relics;
+    const coins = sim.runCoins(run);
+    meta.coins += coins;
     meta.runs++;
     saveMeta(meta);
     const summary: RunSummary = {
@@ -560,10 +560,10 @@ export function createOuterDefenseScene(game: Game): Scene {
       bosses: run.bosses,
       held: sim.wavesHeld(run),
       time: run.time,
-      relics,
+      coins,
       newBest,
     };
-    game.go('stand', summary); // Relics so far are saved; the Last Stand adds its own
+    game.go('stand', summary); // Coins so far are saved; the Last Stand adds its own
   };
 
   const onVisibility = () => {
@@ -573,7 +573,7 @@ export function createOuterDefenseScene(game: Game): Scene {
   // ---------- Scene ----------
   return {
     enter() {
-      run = sim.createRun(Date.now(), runOptions(game.meta.upgrades));
+      run = sim.createRun(Date.now(), runOptions(game.meta.web));
       // Add ?dev to the URL for lots of gold (handy for testing new towers).
       if (new URLSearchParams(location.search).has('dev')) run.gold = 99_999;
       selected = null;
@@ -734,8 +734,8 @@ export function createOuterDefenseScene(game: Game): Scene {
       // The tower being placed, with its range: white where it fits, red where it doesn't.
       if (placing?.show) {
         const ok = sim.canBuild(run, placing.type, placing.x, placing.y);
-        const def = towerDef(placing.type);
-        rangeCircle(ctx, placing.x, placing.y, def.levels[0].range, ok);
+        const range = sim.towerStats(run, placing.type, sim.startLevel(run, placing.type)).range;
+        rangeCircle(ctx, placing.x, placing.y, range, ok);
         ctx.fillStyle = ok ? 'rgba(255,255,255,.35)' : 'rgba(255,60,60,.45)';
         ctx.beginPath();
         ctx.arc(placing.x * tile, placing.y * tile, GAME.towerRadius * tile, 0, Math.PI * 2);
@@ -747,7 +747,8 @@ export function createOuterDefenseScene(game: Game): Scene {
           ctx.translate(placing.x * tile, (placing.y + GAME.towerRadius * 0.32) * tile);
           drawPerson(ctx, tile * PERSON_SIZE, look, { throw: -1, t: clock });
           ctx.restore();
-        } else emoji(ctx, def.emoji, placing.x * tile, placing.y * tile, tile * 0.7);
+        } else
+          emoji(ctx, towerDef(placing.type).emoji, placing.x * tile, placing.y * tile, tile * 0.7);
         ctx.globalAlpha = 1;
       }
       ctx.restore();

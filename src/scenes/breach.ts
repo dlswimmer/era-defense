@@ -1,8 +1,8 @@
-// Run results, shown after the Last Stand (Phase 2) ends. Phase 2 (the side-view Last Stand) will start from here in
-// M2. For now it shows the run's results and the Relics earned.
+// Run results, shown after the Last Stand (Phase 2) ends: how it went and the coins earned.
 import type { Game, RunSummary, Scene } from '../game';
 import { ERAS } from '../sim/data/eras';
-import { META_UPGRADES, nextCost } from '../sim/data/metaUpgrades';
+import { canBuyAnything } from '../sim/web';
+import { coinsEl } from '../ui/coins';
 import { el, hideOverlay, showOverlay } from '../ui/dom';
 
 export function createBreachScene(game: Game): Scene {
@@ -11,19 +11,12 @@ export function createBreachScene(game: Game): Scene {
   const stat = (v: string, l: string) =>
     el('div', { class: 'stat' }, el('div', { class: 'v' }, v), el('div', { class: 'l' }, l));
 
-  /** True when there is an upgrade the player can afford right now. */
-  const canBuySomething = () =>
-    META_UPGRADES.some((up) => {
-      const cost = nextCost(up, game.meta.upgrades[up.id] ?? 0);
-      return cost !== null && cost <= game.meta.relics;
-    });
-
   const show = () => {
     const era = ERAS[summary.era]!;
     const stand = summary.stand;
     const secs = Math.round(summary.time + (stand?.time ?? 0));
     const time = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-    const shop = canBuySomething();
+    const shop = canBuyAnything(game.meta.web, game.meta.coins);
     showOverlay(
       el(
         'div',
@@ -32,7 +25,7 @@ export function createBreachScene(game: Game): Scene {
         summary.newBest
           ? el('p', { style: 'color:var(--gold);font-weight:800' }, '🏆 New best!')
           : '',
-        el('div', { class: 'relics big-relics' }, `+${summary.relics} 🦴 Relics`),
+        el('div', { class: 'big-coins' }, coinsEl(summary.coins, '+')),
         el(
           'div',
           { class: 'stats' },
@@ -50,7 +43,8 @@ export function createBreachScene(game: Game): Scene {
               class: `btn ${shop ? 'go big nudge' : 'primary'}`,
               onclick: () => game.go('upgrades'),
             },
-            `🦴 Upgrades (${game.meta.relics})`,
+            '🕸️ Upgrades ',
+            coinsEl(game.meta.coins),
           ),
           el(
             'div',

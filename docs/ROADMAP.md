@@ -36,6 +36,14 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   Relics = Phase 1 + 1 per wave held at the wall + 2 per boss. Bot runs last 40-80 s.
   `?stand=<era>` jumps straight into a Last Stand for testing.
 
+- **Upgrade web (Nov 13):** the Upgrades screen is now a spiderweb like node-wars. Home in the
+  middle, the 6 eras in a ring, each era a slice with its towers (left), defenders (right) and
+  Camp upgrades (Treasure, Strong Arms, Lucky Find, Thick Wall). Each tower and defender has 8
+  upgrades (Power, Speed, Reach, II and III, then a Mastery). Evolve needs every tower and
+  defender of your era unlocked and upgraded. Drag, pinch or scroll to zoom, tap to buy.
+  Relics became coins (copper, silver, gold, platinum). Pacing: about 15 hours to reach the
+  Future, slower each era (`npm run balance -- campaign`).
+
 ## Decided in planning (Nov 13) — not built yet
 
 - **Long-running meta loop.** Runs stay short, but permanent progress should last months, with
@@ -64,7 +72,8 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   trees). Get the kids' reactions, then do the next era's people and monsters in `src/art/`.
 - **Last Stand next steps:** pick the 4 defenders per era with the kids (data in
   `src/sim/data/units.ts`), a 2.5D look in the graphics pass, flying enemies, wall repair.
-- **M3 rest:** more upgrades (tower mastery, heroes, base blueprints), Relics from Phase 2 time.
+- **M3 rest:** heroes, base blueprints. Idea (David, not planned yet): a Time Machine that
+  starts you over for a currency that boosts everything (prestige).
 - **M4 Run variety:** card picks every 3 waves, event waves.
 - **M5 Polish:** sound, hero unit, base abilities, credits screen.
 
@@ -73,4 +82,4 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 1. One save per kid on a shared device?
 2. Game name (let the kids vote).
 
-Decided: Phase 2 is a side view; the first leak ends Phase 1; Evolve is a Relic upgrade.
+Decided: Phase 2 is a side view; the first leak ends Phase 1; Evolve is in the upgrade web.

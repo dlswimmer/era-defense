@@ -2,7 +2,7 @@
 // check it still feels right with the kids, then update the bands.
 import { describe, expect, it } from 'vitest';
 import { ERAS } from '../data/eras';
-import { playRun, playStand } from './bot';
+import { playCampaign, playRun, playStand } from './bot';
 
 const seeds = [1, 2, 3, 4];
 
@@ -16,8 +16,14 @@ describe('balance', () => {
     }
   });
 
-  it('the first run earns enough Relics to evolve', () => {
-    for (const r of stone) expect(r.relics).toBeGreaterThanOrEqual(ERAS[1]!.relicCost);
+  // David: early eras are quick, later ones take longer (about 14 hours to reach the Future).
+  // `npm run balance -- campaign` shows the whole campaign.
+  it('the Stone Age takes about a dozen runs, and Ancient about twice that', () => {
+    const [stoneAge, ancient] = playCampaign(seeds[0]!, 1);
+    expect(stoneAge!.runs).toBeGreaterThanOrEqual(8);
+    expect(stoneAge!.runs).toBeLessThanOrEqual(20);
+    expect(ancient!.runs).toBeGreaterThanOrEqual(stoneAge!.runs * 1.4);
+    expect(ancient!.runs).toBeLessThanOrEqual(40);
   });
 
   // Phase 1 ends on the first leak, so every era stays a short run. Harder maps will keep it

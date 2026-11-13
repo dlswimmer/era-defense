@@ -440,60 +440,110 @@ body {
   }
 }
 
-/* ---------- Upgrades ---------- */
-.relics {
+/* ---------- Coins ---------- */
+.coins {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.coin {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.coin i {
+  width: 0.85em;
+  height: 0.85em;
+  border-radius: 50%;
   display: inline-block;
-  background: var(--panel-2);
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-weight: 800;
-  font-size: 18px;
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.coin.copper i {
+  background: #d4844a;
+}
+.coin.silver i {
+  background: #c9d1da;
+}
+.coin.gold i {
+  background: #ffcf3f;
+}
+.coin.platinum i {
+  background: #9ff0ff;
 }
 .flash {
   color: var(--gold) !important;
   font-weight: 800;
 }
-.upgrades {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-  text-align: left;
+.big-coins {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 4px 0 2px;
 }
-.upgrade {
+
+/* ---------- Upgrade web ---------- */
+.web-info {
   display: flex;
   gap: 10px;
   align-items: center;
-  background: var(--panel-2);
-  border-radius: 12px;
-  padding: 8px 10px;
+  height: 112px; /* fixed so the web doesn't jump when the panel changes */
+  overflow-y: auto;
 }
-.upgrade.era {
-  background: #4b3a73;
-}
-.upgrade .em {
-  font-size: 30px;
-  width: 38px;
+.web-info .em {
+  font-size: 34px;
+  width: 44px;
   text-align: center;
+  flex: none;
 }
-.upgrade .txt {
+.web-info .txt {
   flex: 1;
+  min-width: 0;
   font-size: 13px;
   line-height: 1.35;
 }
-.upgrade .txt b {
-  font-size: 15px;
+.web-info .txt b {
+  font-size: 16px;
 }
-.upgrade .extra {
+.web-info .need {
+  color: #ffb547;
+  font-weight: 700;
+}
+.web-info .credit {
   color: var(--gold);
+  font-size: 12px;
 }
-.upgrade .btn {
-  min-width: 72px;
+.web-info .btn {
+  min-width: 96px;
+  flex: none;
 }
-.big-relics {
-  font-size: 24px;
+.web-hint {
+  color: var(--muted);
+  text-align: center;
+  font-size: 14px;
+  padding: 8px 4px;
+  height: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.web-toast {
+  min-height: 20px;
+  text-align: center;
   color: var(--gold);
-  margin: 4px 0 2px;
+  font-weight: 800;
+  font-size: 14px;
+}
+.hud-chip.coins-chip {
+  font-size: 17px;
+}
+.hud-btn {
+  min-height: 36px;
+  min-width: 44px;
+  padding: 2px 8px;
+  font-size: 16px;
 }
 .teaser {
   font-size: 13px;

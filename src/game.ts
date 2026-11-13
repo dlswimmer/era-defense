@@ -31,8 +31,8 @@ export interface RunSummary {
   bosses: number;
   held: number;
   time: number;
-  relics: number; // Phase 1 + Last Stand
+  coins: number; // Phase 1 + Last Stand, in copper
   newBest: boolean;
   /** The Last Stand (Phase 2), once it has been played. */
-  stand?: { held: number; wave: number; kills: number; time: number; relics: number };
+  stand?: { held: number; wave: number; kills: number; time: number; coins: number };
 }

@@ -16,16 +16,18 @@ with and for David's kids. Must work with touch in portrait on phones, and with 
   `run.events` that scenes turn into effects. Tests sit next to the code (`*.test.ts`).
 - Content is data in `src/sim/data/` (eras, towers, enemies, waves, maps, game knobs,
   `units` + `stand` for the Last Stand,
-  `metaUpgrades` for Relic upgrades). Adding a
+  `web` for upgrade-web prices and effects). Adding a
   kid's idea should usually be one entry there, with `by: '<name>'` for the in-game credit.
 - `src/scenes/` draws and handles input: `menu`, `outerDefense` (Phase 1), `lastStand` (Phase 2,
-  side view, sim in `src/sim/stand.ts`), `breach` (run results), `upgrades` (spend Relics; Evolve lives here). `src/ui/` has DOM helpers and the 💡 Idea Box.
+  side view, sim in `src/sim/stand.ts`), `breach` (run results), `upgrades` (the upgrade web: spend coins; Evolve lives here; rules in `src/sim/web.ts`). `src/ui/` has DOM helpers and the 💡 Idea Box.
 - `src/art/` draws the cartoon sprites in code (`sprites.ts`) and maps content to them
   (`cast.ts`). Content without art falls back to its emoji.
 - Saves: `src/save.ts`, versioned localStorage, always in try/catch. Bump the version and
   migrate when the shape changes.
 - Use the seeded RNG (`run.rng`) inside the sim, never `Math.random`.
 - After balance changes, run `npm run balance`; `src/sim/playtest/balance.test.ts` locks the band.
+  `npm run balance -- campaign` plays a whole campaign through the upgrade web (runs and hours per era).
+- Coins are one number of copper (`src/sim/coins.ts`), shown as copper/silver/gold/platinum.
 
 ## Conventions
 

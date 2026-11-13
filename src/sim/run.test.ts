@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ERAS } from './data/eras';
 import { GAME } from './data/game';
-import { runOptions } from './data/metaUpgrades';
 import { towerDef, upgradeCost } from './data/towers';
 import { enemyDef } from './data/enemies';
 import { WAVES, buildWave, hpScale, rankFor } from './data/waves';
@@ -9,6 +8,7 @@ import { createRng } from './rng';
 import { posAt } from './path';
 import { bestSpot } from './playtest/bot';
 import * as sim from './run';
+import { runOptions } from './web';
 
 /** Runs the sim until `wave` has finished spawning and the field is clear, or one gets through. */
 /** Fills the best spots with maxed-out Rock Throwers. */
@@ -127,18 +127,35 @@ describe('targeting', () => {
   });
 });
 
-describe('run options (Relic upgrades)', () => {
-  it('starts in the unlocked era with its gold, power and a head start on waves', () => {
-    const run = sim.createRun(1, runOptions({ era: 2, gold: 2, power: 3 }));
+describe('run options (upgrade web)', () => {
+  it('starts in the newest era with its head start on waves, Treasure and Strong Arms', () => {
+    const run = sim.createRun(
+      1,
+      runOptions(['era:ancient', 'era:medieval', 'camp:stone:treasure', 'camp:stone:arms']),
+    );
     expect(run.era).toBe(2);
-    expect(run.gold).toBe(ERAS[2]!.startGold + 50);
-    expect(run.damageBonus).toBeCloseTo(1.3);
+    expect(run.gold).toBe(ERAS[2]!.startGold + Math.round(ERAS[0]!.startGold * 0.3));
+    expect(run.damageBonus).toBeCloseTo(1.1);
     expect(run.wave).toBe(WAVES.tierEvery);
     expect(sim.wavesHeld(run)).toBe(0);
   });
 
-  it('never goes past the last era', () => {
-    expect(runOptions({ era: 99 }).era).toBe(ERAS.length - 1);
+  it('only offers towers unlocked in the web', () => {
+    const run = sim.createRun(1, runOptions(['era:ancient', 'era:medieval']));
+    expect(sim.isUnlocked(run, 'rock')).toBe(true);
+    expect(sim.isUnlocked(run, 'catapult')).toBe(true);
+    expect(sim.isUnlocked(run, 'cannon')).toBe(false);
+  });
+
+  it('tower upgrades change its stats, and Mastery starts it at level 2', () => {
+    const steps = ['power', 'speed', 'reach', 'power2', 'speed2', 'reach2', 'power3', 'mastery'];
+    const run = sim.createRun(1, runOptions(steps.map((s) => `tower:rock:${s}`)));
+    const base = towerDef('rock').levels[1];
+    const stats = sim.towerStats(run, 'rock', 1);
+    expect(stats.dmg).toBeCloseTo(base.dmg * 1.65);
+    expect(stats.rate).toBeCloseTo(base.rate * 1.25);
+    expect(stats.range).toBeCloseTo(base.range * 1.18);
+    expect(sim.build(run, 'rock', 0.6, 3)!.level).toBe(1);
   });
 });
 

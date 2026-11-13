@@ -9,6 +9,7 @@ import { BOOSTS, STAND, boostEffect, type Boost, type BoostId } from './data/sta
 import { unitDef, type UnitId } from './data/units';
 import { buildWave, hpScale, rankFor, type Spawn } from './data/waves';
 import { createRng, type Rng } from './rng';
+import { NO_MODS, coinsFor, type Mods } from './web';
 
 /** A position on the field. x along the field, y height (down is +), z depth into the screen. */
 export interface Pos3 {
@@ -72,7 +73,11 @@ export interface Stand {
   gap: number;
   spawnTimer: number;
   nextWaveIn: number;
-  damageBonus: number; // from Relic upgrades
+  damageBonus: number; // from Camp upgrades (Strong Arms)
+  /** Defenders you can hire (from the upgrade web), or null for every one up to your era. */
+  allowed: UnitId[] | null;
+  unitMods: Partial<Record<UnitId, Mods>>;
+  coinBonus: number;
   kills: number;
   bosses: number;
   time: number;
@@ -86,10 +91,14 @@ export interface StandOptions {
   wave: number; // the wave Phase 1 reached
   chest: number;
   damageBonus?: number;
+  units?: UnitId[];
+  unitMods?: Partial<Record<UnitId, Mods>>;
+  wallBonus?: number;
+  coinBonus?: number;
 }
 
 export function createStand(seed: number, opts: StandOptions): Stand {
-  const wall = ERAS[opts.era]!.wallHp * STAND.wallHpScale;
+  const wall = Math.round(ERAS[opts.era]!.wallHp * STAND.wallHpScale * (1 + (opts.wallBonus ?? 0)));
   const start = Math.max(0, opts.wave - 1); // the wave that broke through comes again
   return {
     rng: createRng(seed),
@@ -108,6 +117,9 @@ export function createStand(seed: number, opts: StandOptions): Stand {
     spawnTimer: 0,
     nextWaveIn: STAND.firstWaveIn,
     damageBonus: opts.damageBonus ?? 1,
+    allowed: opts.units ?? null,
+    unitMods: opts.unitMods ?? {},
+    coinBonus: opts.coinBonus ?? 0,
     kills: 0,
     bosses: 0,
     time: 0,
@@ -143,7 +155,8 @@ export const wallStop = (e: Attacker) => STAND.wall.front + 0.3 * (e.boss ? GAME
 
 // ---------- Player actions ----------
 
-export const isUnitUnlocked = (stand: Stand, type: UnitId) => unitDef(type).era <= stand.era;
+export const isUnitUnlocked = (stand: Stand, type: UnitId) =>
+  stand.allowed ? stand.allowed.includes(type) : unitDef(type).era <= stand.era;
 
 export const wallFull = (stand: Stand) => stand.defenders.length >= STAND.maxDefenders;
 
@@ -157,15 +170,22 @@ export function canHire(stand: Stand, type: UnitId): boolean {
 }
 
 /** Buys a defender. It takes the next free place on the wall. */
-export function hire(stand: Stand, type: UnitId): Defender | null {
-  if (!canHire(stand, type)) return null;
-  stand.chest -= unitDef(type).cost;
+export function hire(stand: Stand, type: UnitId, free = false): Defender | null {
+  if (free ? stand.over || wallFull(stand) : !canHire(stand, type)) return null;
+  if (!free) stand.chest -= unitDef(type).cost;
   const taken = new Set(stand.defenders.map((d) => d.seat));
   let seat = 0;
   while (taken.has(seat)) seat++;
   const unit: Defender = { id: stand.nextId++, type, seat, cooldown: 0 };
   stand.defenders.push(unit);
   return unit;
+}
+
+/** Mastery: each defender type with it brings one free to the start of the Last Stand. */
+export function hireMasteryBuddies(stand: Stand) {
+  for (const [type, m] of Object.entries(stand.unitMods) as [UnitId, Mods][]) {
+    if (m.mastery && isUnitUnlocked(stand, type)) hire(stand, type, true);
+  }
 }
 
 /** War Chest for the next level of a boost, or null when it's maxed (or the wall is full HP). */
@@ -194,10 +214,11 @@ export function buyBoost(stand: Stand, id: BoostId): boolean {
 /** A defender's stats with the team boosts. */
 export function defenderStats(stand: Stand, type: UnitId) {
   const def = unitDef(type);
+  const m = stand.unitMods[type] ?? NO_MODS;
   return {
-    dmg: def.dmg * boostEffect.power(stand.boosts.power) * stand.damageBonus,
-    rate: def.rate * boostEffect.speed(stand.boosts.speed),
-    range: def.range + boostEffect.reach(stand.boosts.reach),
+    dmg: def.dmg * m.dmg * boostEffect.power(stand.boosts.power) * stand.damageBonus,
+    rate: def.rate * m.rate * boostEffect.speed(stand.boosts.speed),
+    range: def.range * m.range + boostEffect.reach(stand.boosts.reach),
   };
 }
 
@@ -205,8 +226,9 @@ export function defenderStats(stand: Stand, type: UnitId) {
 export const standWavesHeld = (stand: Stand) =>
   Math.max(0, stand.wave - stand.startWave - (stand.over ? 1 : 0));
 
-/** Relics for the Last Stand: 1 per wave held at the wall, plus 2 per boss stopped. */
-export const standRelics = (stand: Stand) => standWavesHeld(stand) + 2 * stand.bosses;
+/** Coins for the Last Stand: 1 per wave held at the wall and 2 per boss stopped, scaled by the era. */
+export const standCoins = (stand: Stand) =>
+  coinsFor(standWavesHeld(stand) + 2 * stand.bosses, stand.era, stand.coinBonus);
 
 // ---------- Simulation ----------
 

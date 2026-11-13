@@ -3,6 +3,7 @@ import { drawMap, fitCanvas } from '../render';
 import { ERAS } from '../sim/data/eras';
 import { MAPS } from '../sim/data/maps';
 import { prepareMap } from '../sim/path';
+import { coinsEl } from '../ui/coins';
 import { openIdeaBox } from '../ui/ideas';
 import { $, el, hideOverlay, showOverlay } from '../ui/dom';
 
@@ -23,7 +24,7 @@ export function createMenuScene(game: Game): Scene {
         el(
           'p',
           {},
-          "Build towers. Don't let anyone through. Earn Relics to evolve from rocks to lasers!",
+          "Build towers. Don't let anyone through. Earn coins to evolve from rocks to lasers!",
         ),
         best.wave
           ? el(
@@ -39,14 +40,15 @@ export function createMenuScene(game: Game): Scene {
           el(
             'button',
             { class: 'btn primary', onclick: () => game.go('upgrades') },
-            `🦴 Upgrades (${game.meta.relics})`,
+            '🕸️ Upgrades ',
+            coinsEl(game.meta.coins),
           ),
           el('button', { class: 'btn', onclick: () => openIdeaBox(game, show) }, '💡 Idea Box'),
         ),
         el(
           'p',
           { style: 'font-size:13px;margin-top:16px' },
-          'Drag a tower onto the grass to build. Stop enemies to earn 💰 gold. When one gets through, hold the wall in the Last Stand with ⚔️ War Chest defenders. Then you get 🦴 Relics: spend them to Evolve and unlock new towers!',
+          'Drag a tower onto the grass to build. Stop enemies to earn 💰 gold. When one gets through, hold the wall in the Last Stand with ⚔️ War Chest defenders. Then you get coins: spend them in the upgrade web to unlock new towers and defenders, make them stronger, and Evolve!',
         ),
       ),
     );
