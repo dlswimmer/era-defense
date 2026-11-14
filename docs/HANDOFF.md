@@ -102,11 +102,11 @@ Why things are the way they are. Keep this current when a decision changes.
   single-target defenders wasted most throws and splash ones won. Now they skip a monster that
   enough damage is already flying at. (3) The Catapult was too weak for its price (Medieval only
   worked with cheap old towers as filler), the Boulder Dropper was weak fresh and too strong
-  maxed (its Powers and Quick Lift II are smaller now), Boiling Oil was too weak.
+  maxed (its Power and Power III are smaller now), Boiling Oil was too weak.
   The bot builds the newest era's towers first now, since old ones are dear, not better.
   Wall monsters grow 36% a wave (was 25%) because the wall got stronger, and web prices for the
-  first three eras went up ~20-30% to keep runs per era (17 / 26 / 36); runs are a bit longer,
-  so hours went up (Stone Age ~1h25, Medieval done at ~7h30).
+  first three eras went up ~20-30% to keep runs per era (17 / 25 / 35); runs are a bit longer,
+  so hours went up (Stone Age ~1h25, Medieval done at ~7h40).
 - **Upgrade swaps:** every tower and defender gets the same 8-step line, but
   `STEP_SWAPS` in `src/sim/data/web.ts` can replace steps for one of them (same place and
   price), e.g. Sticky Net instead of Power for the Net Thrower.

@@ -70,11 +70,10 @@ export const STEP_SWAPS: Record<string, Record<string, Omit<Step, 'cost'>>> = {
   boulder: {
     speed: { id: 'speed', name: 'Quick Lift', emoji: '⚡', effect: { rate: 0.1 } },
     reach: { id: 'splash', name: 'Big Splash', emoji: '💥', effect: { splash: 0.1 } },
-    speed2: { id: 'speed2', name: 'Quick Lift II', emoji: '⚡', effect: { rate: 0.1 } },
+    speed2: { id: 'speed2', name: 'Quick Lift II', emoji: '⚡', effect: { rate: 0.15 } },
     reach2: { id: 'reach2', name: 'Long Heave', emoji: '🎯', effect: { range: 0.08 } },
-    // Splash already hits a crowd, so its Powers are smaller (keeps a maxed one in line).
+    // Splash already hits a crowd, so its Power and Power III are smaller (keeps a maxed one in line).
     power: { id: 'power', name: 'Power', emoji: '💥', effect: { dmg: 0.1 } },
-    power2: { id: 'power2', name: 'Power II', emoji: '💥', effect: { dmg: 0.1 } },
     power3: { id: 'power3', name: 'Power III', emoji: '💥', effect: { dmg: 0.1 } },
   },
 };

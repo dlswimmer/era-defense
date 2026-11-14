@@ -77,7 +77,7 @@ export const TOWERS = {
     name: 'Catapult',
     emoji: '🎯',
     era: 2,
-    cost: 85,
+    cost: 95,
     kind: 'shot',
     splash: 0.9,
     shot: { emoji: '🪨', size: 0.4, speed: 5 },

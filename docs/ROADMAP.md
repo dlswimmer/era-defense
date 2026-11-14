@@ -68,7 +68,7 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   (`npm run balance -- units`). Old-era gear costs more in a newer era, defenders stop
   doubling up on one monster, and the Boulder Dropper, Catapult and Boiling Oil were retuned:
   maxed old ones are now ~0-25% better than the next starter instead of 2-3×. Runs per era held
-  (17 / 26 / 36); each run is a bit longer.
+  (17 / 25 / 35); each run is a bit longer.
 
 - **New monsters for Ancient and Medieval (David, Nov 14):** two per era that play differently,
   next to the armored Grumblers and Brutes. Ancient: the Scarab Scuttler (small, fast, comes in
