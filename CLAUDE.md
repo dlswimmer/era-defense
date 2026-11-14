@@ -39,3 +39,6 @@ with and for David's kids. Must work with touch in portrait on phones, and with 
 - Small, shippable changes that keep the game playable after every commit.
 - Plan in `docs/PROJECT_PLAN.md`, progress in `docs/ROADMAP.md`, reasons in `docs/HANDOFF.md`.
 - Credit kids' ideas in `IDEAS.md` and in the game.
+- Every PR that changes the game adds a patch note at the TOP of `src/changelog.ts` (next id,
+  usually the PR number), in short kid-friendly words. It shows on the ⚙️ Options screen, with
+  build info (version, commit, build time) baked in by `vite.config.ts`.

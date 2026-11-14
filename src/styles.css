@@ -577,3 +577,83 @@ body {
 .stand-shop .shop .btn.boost {
   background: #3b3f6b;
 }
+
+/* ---------- Options & patch notes ---------- */
+.card .row > .btn {
+  flex: 1;
+}
+.btn .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff5252;
+  box-shadow: 0 0 0 2px var(--panel-2);
+  margin-left: 2px;
+}
+.card p.build-label {
+  font-size: 11px;
+  opacity: 0.7;
+  margin: 10px 0 0;
+}
+.build-info {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  text-align: left;
+  background: var(--panel-2);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 8px 0 4px;
+  font-size: 14px;
+}
+.build-info dt {
+  color: var(--muted);
+}
+.build-info dd {
+  margin: 0;
+  font-weight: 700;
+}
+.build-info a {
+  color: var(--accent);
+}
+.card h2.notes-title {
+  font-size: 20px;
+  margin-top: 16px;
+}
+.patch-notes {
+  text-align: left;
+  margin-bottom: 14px;
+}
+.patch-notes .update {
+  border-left: 4px solid var(--panel-2);
+  padding: 2px 0 2px 10px;
+  margin-bottom: 12px;
+}
+.patch-notes .update.new {
+  border-left-color: var(--gold);
+}
+.patch-notes h3 {
+  margin: 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.patch-notes .new-tag {
+  background: #ff5252;
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.patch-notes .when {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 2px 0 4px;
+}
+.patch-notes ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.4;
+}

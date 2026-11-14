@@ -104,6 +104,9 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   and monsters walk in faster. Bots hold about 8 wall waves (casual play 4-8) in about 2-3 min.
   Wall waves pay half a coin each so the web's pacing holds (Stone Age ~17 runs). Repair only
   shows in the shop while the wall is hurt. `npm run balance -- testers` compares play styles.
+- **Options & patch notes (David, Nov 14):** ⚙️ Options on the menu shows the version, commit
+  and build time, plus kid-friendly patch notes from `src/changelog.ts`. A red dot marks an
+  unread update, and the menu shows the update number and build time.
 
 ## Next
 

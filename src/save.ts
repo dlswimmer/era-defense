@@ -19,10 +19,11 @@ export interface Meta {
   web: string[]; // upgrade-web nodes bought, in the order they were bought (src/sim/web.ts)
   ideas: Idea[];
   lastName: string;
+  seenUpdate: number; // newest patch note read on the Options screen (src/changelog.ts)
 }
 
 const KEY = 'eraDefense.save';
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export function defaultMeta(): Meta {
   return {
@@ -33,6 +34,7 @@ export function defaultMeta(): Meta {
     web: [],
     ideas: [],
     lastName: '',
+    seenUpdate: 0,
   };
 }
 
@@ -73,6 +75,7 @@ export function migrate(raw: unknown): Meta {
     coins,
     web,
     ideas: Array.isArray(r.ideas) ? r.ideas : [],
+    seenUpdate: typeof r.seenUpdate === 'number' ? r.seenUpdate : 0,
     version: SAVE_VERSION,
   };
 }
