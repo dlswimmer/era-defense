@@ -3,6 +3,7 @@ import { CHANGELOG } from '../changelog';
 import type { Game } from '../game';
 import { saveMeta } from '../save';
 import { el, hideOverlay, showOverlay } from './dom';
+import { devUnlockTapper, renderDevTools } from './devTools';
 import { checkForUpdate, reloadToUpdate } from './update';
 
 const REPO = 'https://github.com/dlswimmer/era-defense';
@@ -52,6 +53,10 @@ export function openOptions(game: Game, onClose: () => void = () => {}) {
     el('dd', {}, commitNode),
   );
 
+  const devBox = el('div', { class: 'dev-tools' });
+  renderDevTools(game, devBox);
+  info.addEventListener('click', devUnlockTapper(game, devBox));
+
   const notes = el(
     'div',
     { class: 'patch-notes' },
@@ -95,6 +100,7 @@ export function openOptions(game: Game, onClose: () => void = () => {}) {
       info,
       el('div', { class: 'stack' }, updateBtn),
       updateStatus,
+      devBox,
       el('h2', { class: 'notes-title' }, '📜 Patch notes'),
       notes,
       el('div', { class: 'row' }, el('button', { class: 'btn primary', onclick: close }, 'Done')),

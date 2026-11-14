@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultMeta, migrate, SAVE_VERSION } from './save';
+import { defaultMeta, migrate, resetMeta, SAVE_VERSION } from './save';
 
 describe('migrate', () => {
   it('returns defaults for junk', () => {
@@ -39,5 +39,25 @@ describe('migrate', () => {
     expect(m.coins).toBe(55);
     expect(m.web).toEqual(['era:ancient']);
     expect(m.seenUpdate).toBe(0);
+  });
+});
+
+describe('resetMeta', () => {
+  it('starts over but keeps ideas, the name and dev mode', () => {
+    const old = migrate({
+      coins: 500,
+      web: ['era:ancient'],
+      dev: true,
+      devGold: true,
+      lastName: 'Sam',
+    });
+    old.ideas.push({ name: 'Sam', text: 'lava tower', date: 'x' });
+    const fresh = resetMeta(old);
+    expect(fresh.coins).toBe(0);
+    expect(fresh.web).toEqual([]);
+    expect(fresh.devGold).toBe(false);
+    expect(fresh.dev).toBe(true);
+    expect(fresh.lastName).toBe('Sam');
+    expect(fresh.ideas).toHaveLength(1);
   });
 });

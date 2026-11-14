@@ -16,7 +16,7 @@ import {
 import { Puffs, RELEASE, drawShadow } from '../art/sprites';
 import type { Game, RunSummary, Scene } from '../game';
 import { emoji, enemyBars, fitCanvas, hpBar, shade, text } from '../render';
-import { saveMeta } from '../save';
+import { devGold, saveMeta } from '../save';
 import { ERAS, type Era } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
 import { GAME } from '../sim/data/game';
@@ -689,7 +689,7 @@ export function createLastStandScene(game: Game): Scene {
         coinBonus: opts.coinBonus,
       });
       st.hireMasteryBuddies(stand);
-      if (new URLSearchParams(location.search).has('dev')) stand.chest = 99_999;
+      if (devGold(game.meta)) stand.chest = 99_999;
       camX = 0;
       drag = null;
       speed = 1;

@@ -11,6 +11,12 @@ export interface Update {
 
 export const CHANGELOG: Update[] = [
   {
+    id: 16,
+    date: '2026-11-14',
+    title: 'Dev mode for testing',
+    notes: ['🛠️ Tester tools for grown-ups, to try new stuff fast.'],
+  },
+  {
     id: 15,
     date: '2026-11-14',
     title: 'Check for updates',

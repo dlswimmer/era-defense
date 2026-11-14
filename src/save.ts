@@ -20,10 +20,12 @@ export interface Meta {
   ideas: Idea[];
   lastName: string;
   seenUpdate: number; // newest patch note read on the Options screen (src/changelog.ts)
+  dev: boolean; // dev mode unlocked (tap the build info in Options 5 times)
+  devGold: boolean; // dev mode: runs start with lots of gold and War Chest
 }
 
 const KEY = 'eraDefense.save';
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export function defaultMeta(): Meta {
   return {
@@ -35,6 +37,8 @@ export function defaultMeta(): Meta {
     ideas: [],
     lastName: '',
     seenUpdate: 0,
+    dev: false,
+    devGold: false,
   };
 }
 
@@ -76,6 +80,8 @@ export function migrate(raw: unknown): Meta {
     web,
     ideas: Array.isArray(r.ideas) ? r.ideas : [],
     seenUpdate: typeof r.seenUpdate === 'number' ? r.seenUpdate : 0,
+    dev: r.dev === true,
+    devGold: r.devGold === true,
     version: SAVE_VERSION,
   };
 }
@@ -95,4 +101,19 @@ export function saveMeta(meta: Meta): void {
   } catch {
     // Storage blocked or full: the game still works, it just won't remember.
   }
+}
+
+/** Dev mode "reset": a fresh save that keeps the kids' ideas, their name and dev mode itself. */
+export function resetMeta(old: Meta): Meta {
+  return { ...defaultMeta(), ideas: old.ideas, lastName: old.lastName, dev: old.dev };
+}
+
+/** Runs start with lots of gold: the ?dev URL, or the dev mode switch. */
+export function devGold(meta: Meta): boolean {
+  try {
+    if (new URLSearchParams(location.search).has('dev')) return true;
+  } catch {
+    // No location (tests).
+  }
+  return meta.devGold;
 }

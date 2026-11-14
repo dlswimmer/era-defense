@@ -662,3 +662,15 @@ body {
   min-height: 1.4em;
   margin: 6px 0 0;
 }
+.dev-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.dev-grid .btn {
+  font-size: 14px;
+}
+.dev-tools .coins {
+  vertical-align: middle;
+}
