@@ -1,8 +1,9 @@
 // Bot playtests. `npm run balance [-- <runs per era>]`: for each starting era, how long a decent
 // player holds out. `npm run balance -- campaign`: a whole campaign through the upgrade web, to
-// check how many runs (and hours) each era takes.
+// check how many runs (and hours) each era takes. `npm run balance -- testers`: Stone Age timing
+// for different play styles (casual kid, tower spammer, booster...).
 import { ERAS } from '../src/sim/data/eras';
-import { playCampaign, playRun } from '../src/sim/playtest/bot';
+import { TESTERS, playCampaign, playRun, playStand } from '../src/sim/playtest/bot';
 import { coinText } from '../src/sim/coins';
 
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -11,7 +12,28 @@ const clock = (mins: number) =>
 /** Menus, the results screen and shopping between runs, in minutes per run. */
 const BETWEEN_RUNS = 0.5;
 
-if (process.argv[2] === 'campaign') {
+if (process.argv[2] === 'testers') {
+  const seeds = [1, 2, 3, 4, 5, 6];
+  const range = (xs: number[]) => {
+    const lo = Math.min(...xs);
+    const hi = Math.max(...xs);
+    return lo === hi ? `${lo}` : `${lo}-${hi}`;
+  };
+  const mmss = (s: number) =>
+    `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+  console.log('First Stone Age run, then runs to Evolve out of the Stone Age:');
+  console.log('Tester        | trail waves | wall waves | trail time | wall time | runs to Evolve');
+  for (const t of TESTERS) {
+    const p1 = seeds.map((s) => playRun(s, {}, 3600, t));
+    const p2 = p1.map((r, i) =>
+      playStand(seeds[i]!, { era: 0, wave: r.wave, chest: r.chest }, 1800, t),
+    );
+    const evolve = seeds.slice(0, 3).map((s) => playCampaign(s, 0, 3000, t)[0]!.runs);
+    console.log(
+      `${t.name.padEnd(13)} | ${range(p1.map((r) => r.held)).padStart(11)} | ${range(p2.map((s) => s.held)).padStart(10)} | ${mmss(avg(p1.map((r) => r.time))).padStart(10)} | ${mmss(avg(p2.map((s) => s.time))).padStart(9)} | ${range(evolve)}`,
+    );
+  }
+} else if (process.argv[2] === 'campaign') {
   const seed = Number(process.argv[3] ?? 1);
   console.log('Era         | runs | play time | total so far');
   let total = 0;

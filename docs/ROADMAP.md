@@ -73,6 +73,13 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   defenders are people who wind up and throw. Enemies are monsters that get more armored, then
   robotic, era by era. Stone Age is done first; other eras keep emoji until they get art.
 
+- **Longer Last Stand (David, Nov 14):** the wall went too fast (about 3 waves vs 7 on the
+  trail). Now the next wall wave waits until the last one has walked in close, wall monsters
+  start at 45% of the breaking wave's toughness and grow 25% a wave, defenders hit 1.5× harder,
+  and monsters walk in faster. Bots hold about 8 wall waves (casual play 4-8) in about 2-3 min.
+  Wall waves pay half a coin each so the web's pacing holds (Stone Age ~17 runs). Repair only
+  shows in the shop while the wall is hurt. `npm run balance -- testers` compares play styles.
+
 ## Next
 
 - **M1 balance pass with the kids.** Knobs: `src/sim/data/game.ts`, `waves.ts`, `towers.ts`,
@@ -80,7 +87,7 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 - **Graphics pass, Stone Age done** (Rock Thrower, Spear Thrower, Grumbler, Woolly Brute, hut,
   trees). Get the kids' reactions, then do the next era's people and monsters in `src/art/`.
 - **Last Stand next steps:** pick the other 2 Stone Age defenders and towers, then 4 per era, with the kids (data in
-  `src/sim/data/units.ts`), a 2.5D look in the graphics pass, flying enemies, wall repair.
+  `src/sim/data/units.ts`), a 2.5D look in the graphics pass, flying enemies.
 - **M3 rest:** heroes, base blueprints. Idea (David, not planned yet): a Time Machine that
   starts you over for a currency that boosts everything (prestige).
 - **M4 Run variety:** card picks every 3 waves, event waves.

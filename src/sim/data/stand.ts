@@ -11,12 +11,22 @@ export const STAND = {
   spawnX: 30, // enemies start about 2 screens away from the wall
   maxDefenders: 10, // how many fit on the wall
   wallHpScale: 15, // wall HP = era.wallHp × this
-  enemySpeed: 1.1, // multiplies enemy speed
+  enemySpeed: 1.8, // multiplies enemy speed
+  // The next wave starts once the last one has walked this close to the wall (tiles), so waves
+  // don't pile up far away while they walk in.
+  nextWaveWithin: 20,
+  // Enemies at the wall start this much weaker than the wave that broke through (the wall gets
+  // a fresh start), then get `hpGrowth` tougher each wave. Never tougher than on the trail.
+  firstHp: 0.45,
+  hpGrowth: 1.25,
   attackEvery: 1, // seconds between an enemy's hits on the wall
   wallDamage: { normal: 1, heavy: 3, boss: 10 },
+  // Coins per wave held at the wall. Last Stands last several waves, so this keeps the
+  // upgrade web's pacing (see `npm run balance -- campaign`).
+  coinsPerWave: 0.5,
   minChest: 15, // you always get at least one defender, even after a rough Phase 1
   firstWaveIn: 1, // seconds before the first wave starts walking in
-  breather: 4, // seconds between waves
+  breather: 3, // seconds between waves, counted once the last wave has walked in close
   boostCostByEra: [1, 2.5, 4.5, 6.5, 10, 15], // boosts cost more in later eras (more War Chest there)
 };
 
