@@ -77,21 +77,21 @@ export const TOWERS = {
     name: 'Catapult',
     emoji: '🎯',
     era: 2,
-    cost: 110,
+    cost: 95,
     kind: 'shot',
     splash: 0.9,
     shot: { emoji: '🪨', size: 0.4, speed: 5 },
     levels: [
-      { dmg: 22, range: 3.2, rate: 0.6 },
-      { dmg: 36, range: 3.4, rate: 0.7 },
-      { dmg: 58, range: 3.6, rate: 0.8 },
+      { dmg: 31, range: 3.2, rate: 0.6 },
+      { dmg: 50, range: 3.4, rate: 0.7 },
+      { dmg: 81, range: 3.6, rate: 0.8 },
     ],
   },
   cannon: {
     name: 'Cannon',
     emoji: '💣',
     era: 3,
-    cost: 170,
+    cost: 165,
     kind: 'shot',
     splash: 1.0,
     shot: { color: '#111', size: 0.14, speed: 9 },
@@ -161,9 +161,9 @@ export type TowerId = keyof typeof TOWERS;
 export const TOWER_IDS = Object.keys(TOWERS) as TowerId[];
 export const towerDef = (id: TowerId): TowerDef => TOWERS[id];
 
-// Cost to go from `level` (0-based) to the next level.
-export function upgradeCost(def: TowerDef, level: number): number {
-  return Math.round(def.cost * (level === 0 ? 0.8 : 1.4));
+// Cost to go from `level` (0-based) to the next level, for a tower that costs `cost` to build.
+export function upgradeCost(cost: number, level: number): number {
+  return Math.round(cost * (level === 0 ? 0.8 : 1.4));
 }
 
 // Selling gives back 70% of everything spent on the tower.

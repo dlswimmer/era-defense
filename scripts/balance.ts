@@ -1,10 +1,14 @@
 // Bot playtests. `npm run balance [-- <runs per era>]`: for each starting era, how long a decent
 // player holds out. `npm run balance -- campaign`: a whole campaign through the upgrade web, to
 // check how many runs (and hours) each era takes. `npm run balance -- testers`: Stone Age timing
-// for different play styles (casual kid, tower spammer, booster...).
+// for different play styles (casual kid, tower spammer, booster...). `npm run balance -- units
+// [eras] [units|towers]`: what each tower and defender is worth in each era, played on its own.
 import { ERAS } from '../src/sim/data/eras';
 import { TESTERS, playCampaign, playRun, playStand } from '../src/sim/playtest/bot';
 import { coinText } from '../src/sim/coins';
+import { TOWER_IDS, towerDef } from '../src/sim/data/towers';
+import { UNIT_IDS, unitDef } from '../src/sim/data/units';
+import { maxedMods, towerWorth, unitPlayWorth, unitWorth } from '../src/sim/playtest/worth';
 
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const clock = (mins: number) =>
@@ -12,7 +16,38 @@ const clock = (mins: number) =>
 /** Menus, the results screen and shopping between runs, in minutes per run. */
 const BETWEEN_RUNS = 0.5;
 
-if (process.argv[2] === 'testers') {
+if (process.argv[2] === 'units') {
+  // What each tower and defender is worth in each era, played on its own (src/sim/playtest/worth.ts).
+  // 1.00 = the era's fresh starter. David: a maxed one from the era before should be ~1.1 there,
+  // and the ones within an era about even.
+  const eras = (process.argv[3] ?? '0,1,2,3').split(',').map(Number);
+  const what = process.argv[4] ?? 'both';
+  const f = (x: number) => x.toFixed(2).padStart(5);
+  for (const era of eras) {
+    console.log(`\n${ERAS[era]!.name}`);
+    if (what !== 'towers') {
+      console.log('Defender        | fresh | maxed | (full wall, no boosts: fresh | maxed)');
+      for (const u of UNIT_IDS.filter(
+        (id) => unitDef(id).era <= era && unitDef(id).era >= era - 1,
+      )) {
+        const m = maxedMods(u);
+        console.log(
+          `${unitDef(u).name.padEnd(15)} | ${f(unitPlayWorth(era, u))} | ${f(unitPlayWorth(era, u, m))} | ${f(unitWorth(era, u))} | ${f(unitWorth(era, u, m))}`,
+        );
+      }
+    }
+    if (what !== 'units') {
+      console.log('Tower           | fresh | maxed');
+      for (const t of TOWER_IDS.filter(
+        (id) => towerDef(id).era <= era && towerDef(id).era >= era - 1,
+      )) {
+        console.log(
+          `${towerDef(t).name.padEnd(15)} | ${f(towerWorth(era, t))} | ${f(towerWorth(era, t, maxedMods(t)))}`,
+        );
+      }
+    }
+  }
+} else if (process.argv[2] === 'testers') {
   const seeds = [1, 2, 3, 4, 5, 6];
   const range = (xs: number[]) => {
     const lo = Math.min(...xs);

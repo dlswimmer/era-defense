@@ -50,7 +50,7 @@ describe('Boulder Dropper', () => {
     const stand = fresh(1000);
     expect(st.hire(stand, 'boulder')).not.toBeNull();
     // Three monsters bunched up just in front of the wall.
-    for (const z of [0.5, 1, 1.5]) {
+    for (const z of [0.8, 1.1, 1.4]) {
       stand.enemies.push({
         id: stand.nextId++,
         type: 'caveman',

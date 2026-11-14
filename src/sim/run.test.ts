@@ -73,7 +73,7 @@ describe('building', () => {
     expect(sim.upgrade(run, tower)).toBe(true);
     expect(sim.upgrade(run, tower)).toBe(false);
     const def = towerDef('rock');
-    const spent = def.cost + upgradeCost(def, 0) + upgradeCost(def, 1);
+    const spent = def.cost + upgradeCost(def.cost, 0) + upgradeCost(def.cost, 1);
     const before = run.gold;
     expect(sim.sell(run, tower)).toBe(Math.floor(spent * 0.7));
     expect(run.gold).toBe(before + Math.floor(spent * 0.7));

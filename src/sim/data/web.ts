@@ -13,7 +13,7 @@ export const WEB = {
    * Prices in each era are multiplied by this. It grows faster than `reward`, so each era takes
    * more runs than the one before (David: early eras quick, later ones slower).
    */
-  price: [2, 50, 600, 12_000, 120_000, 900_000],
+  price: [2.6, 58, 760, 12_000, 120_000, 900_000],
   /** Evolving into the next era costs this × your current era's price scale. */
   evolve: 70,
   /** Unlocking the 2nd, 3rd and 4th tower (or defender) of an era. The 1st comes free. */
@@ -69,9 +69,12 @@ export const STEP_SWAPS: Record<string, Record<string, Omit<Step, 'cost'>>> = {
   },
   boulder: {
     speed: { id: 'speed', name: 'Quick Lift', emoji: '⚡', effect: { rate: 0.1 } },
-    reach: { id: 'splash', name: 'Big Splash', emoji: '💥', effect: { splash: 0.2 } },
+    reach: { id: 'splash', name: 'Big Splash', emoji: '💥', effect: { splash: 0.1 } },
     speed2: { id: 'speed2', name: 'Quick Lift II', emoji: '⚡', effect: { rate: 0.15 } },
-    reach2: { id: 'reach2', name: 'Long Heave', emoji: '🎯', effect: { range: 0.15 } },
+    reach2: { id: 'reach2', name: 'Long Heave', emoji: '🎯', effect: { range: 0.08 } },
+    // Splash already hits a crowd, so its Power and Power III are smaller (keeps a maxed one in line).
+    power: { id: 'power', name: 'Power', emoji: '💥', effect: { dmg: 0.1 } },
+    power3: { id: 'power3', name: 'Power III', emoji: '💥', effect: { dmg: 0.1 } },
   },
 };
 
