@@ -320,12 +320,11 @@ describe('getting through', () => {
 });
 
 describe('waves stay in your era', () => {
-  it('never sends enemies from a later era, but they level up and keep getting tougher', () => {
+  it("only sends the era's own enemies, and they level up and keep getting tougher", () => {
     const rng = createRng(3);
     for (let era = 0; era < ERAS.length; era++) {
       for (let n = 1; n <= 40; n++) {
-        for (const s of buildWave(n, rng, era).spawns)
-          expect(enemyDef(s.id).tier).toBeLessThanOrEqual(era);
+        for (const s of buildWave(n, rng, era).spawns) expect(enemyDef(s.id).tier).toBe(era);
       }
     }
     expect(rankFor(5, 0)).toBe(0);

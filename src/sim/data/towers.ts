@@ -68,9 +68,9 @@ export const TOWERS = {
     kind: 'shot',
     shot: { color: '#6b4423', size: 0.1, speed: 11 },
     levels: [
-      { dmg: 8, range: 2.8, rate: 1.6 },
-      { dmg: 13, range: 3.0, rate: 1.8 },
-      { dmg: 20, range: 3.2, rate: 2.0 },
+      { dmg: 10, range: 2.8, rate: 1.6 },
+      { dmg: 16, range: 3.0, rate: 1.8 },
+      { dmg: 24, range: 3.2, rate: 2.0 },
     ],
   },
   catapult: {
@@ -82,9 +82,9 @@ export const TOWERS = {
     splash: 0.9,
     shot: { emoji: '🪨', size: 0.4, speed: 5 },
     levels: [
-      { dmg: 30, range: 3.2, rate: 0.6 },
-      { dmg: 50, range: 3.4, rate: 0.7 },
-      { dmg: 80, range: 3.6, rate: 0.8 },
+      { dmg: 22, range: 3.2, rate: 0.6 },
+      { dmg: 36, range: 3.4, rate: 0.7 },
+      { dmg: 58, range: 3.6, rate: 0.8 },
     ],
   },
   cannon: {

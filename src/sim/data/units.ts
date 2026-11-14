@@ -48,7 +48,7 @@ export const UNITS = {
     shot: { emoji: '🪃', size: 0.3, speed: 8 },
     dmg: 33,
     range: 6,
-    rate: 1.3,
+    rate: 1.2,
   },
   oil: {
     name: 'Boiling Oil',
@@ -57,7 +57,7 @@ export const UNITS = {
     cost: 55,
     splash: 1.2,
     shot: { color: '#ffb547', size: 0.2, speed: 6 },
-    dmg: 60,
+    dmg: 47,
     range: 3,
     rate: 0.7,
   },
