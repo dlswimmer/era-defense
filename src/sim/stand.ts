@@ -219,6 +219,7 @@ export function defenderStats(stand: Stand, type: UnitId) {
     dmg: def.dmg * m.dmg * boostEffect.power(stand.boosts.power) * stand.damageBonus,
     rate: def.rate * m.rate * boostEffect.speed(stand.boosts.speed),
     range: def.range * m.range + boostEffect.reach(stand.boosts.reach),
+    splash: (def.splash ?? 0) * m.splash,
   };
 }
 
@@ -334,7 +335,7 @@ function fire(stand: Stand, dt: number) {
       ty: enemyY(target),
       tz: target.z,
       dmg: stats.dmg,
-      splash: def.splash ?? 0,
+      splash: stats.splash,
       speed: def.shot.speed,
       unit: u.type,
     });

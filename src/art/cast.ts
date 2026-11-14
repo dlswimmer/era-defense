@@ -7,8 +7,11 @@ import {
   drawBoulder,
   drawBrute,
   drawBush,
+  drawDropper,
   drawGrumbler,
   drawHut,
+  drawNetFlying,
+  drawPerson,
   drawRock,
   drawSpear,
   drawTree,
@@ -36,8 +39,47 @@ const SPEAR_THROWER: PersonLook = {
   weapon: 'spear',
 };
 
-export const TOWER_LOOKS: Partial<Record<TowerId, PersonLook>> = { rock: ROCK_THROWER };
+const NET_THROWER: PersonLook = {
+  skin: '#e2a878',
+  hairColor: '#8a3b1c',
+  hair: 'pony',
+  tunic: '#6aa6a0',
+  spot: '#3f7a74',
+  band: '#f2c94c',
+  feather: '#5aa0e0',
+  weapon: 'net',
+};
+
+export const TOWER_LOOKS: Partial<Record<TowerId, PersonLook>> = {
+  rock: ROCK_THROWER,
+  net: NET_THROWER,
+};
 export const UNIT_LOOKS: Partial<Record<UnitId, PersonLook>> = { spear: SPEAR_THROWER };
+/** Defenders drawn as someone other than a thrower person. */
+const UNIT_ART: Partial<Record<UnitId, 'dropper'>> = { boulder: 'dropper' };
+
+export const hasUnitArt = (id: UnitId) => !!UNIT_LOOKS[id] || !!UNIT_ART[id];
+
+/** Seconds of wind-up before a defender's shot: heaving a boulder takes a while. */
+export const unitWindup = (id: UnitId) => (UNIT_ART[id] === 'dropper' ? 0.7 : 0.3);
+
+/**
+ * Draws a defender with its feet at (0, 0), facing right. `p` is the throw progress (see
+ * PersonPose). Returns false when the defender has no art yet.
+ */
+export function drawUnitArt(
+  ctx: CanvasRenderingContext2D,
+  id: UnitId,
+  s: number,
+  p: number,
+  t: number,
+): boolean {
+  const look = UNIT_LOOKS[id];
+  if (look) drawPerson(ctx, s, look, { throw: p, t });
+  else if (UNIT_ART[id] === 'dropper') drawDropper(ctx, s * 1.25, p, t);
+  else return false;
+  return true;
+}
 
 type MonsterArt = 'grumbler' | 'brute';
 const ENEMY_ART: Partial<Record<EnemyId, MonsterArt>> = { caveman: 'grumbler', mammoth: 'brute' };
@@ -70,7 +112,10 @@ export function drawEnemyArt(
 /** How tall an enemy is drawn, as a share of `s`. Used to place health bars. */
 export const enemyArtHeight = (id: EnemyId) => (ENEMY_ART[id] === 'brute' ? 0.95 : 1);
 
-/** The thing a tower or defender throws, centered on (x, y). Returns false when it has no art. */
+/**
+ * The thing a tower or defender throws, centered on (x, y). `u` is how far along its flight it is
+ * (0..1). Returns false when it has no art.
+ */
 export function drawThrown(
   ctx: CanvasRenderingContext2D,
   kind: TowerId | UnitId,
@@ -78,8 +123,19 @@ export function drawThrown(
   y: number,
   tile: number,
   angle: number,
+  u = 1,
+  radius = tile * 0.8,
 ): boolean {
-  if (kind === 'rock') {
+  if (kind === 'net') {
+    // A rolled-up net that opens as it flies; `radius` is the size it lands at.
+    drawNetFlying(ctx, x, y, radius, Math.min(1, u * 1.4), angle, Math.max(1, tile * 0.03));
+  } else if (kind === 'boulder') {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle * 0.4);
+    drawRock(ctx, 0, 0, tile * 0.28);
+    ctx.restore();
+  } else if (kind === 'rock') {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);

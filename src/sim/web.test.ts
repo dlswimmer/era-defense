@@ -65,7 +65,7 @@ describe('owning and buying', () => {
     expect(nodeState(power, owned, power.cost - 1)).toBe('dear');
     expect(nodeState(node('tower:rock:speed'), owned, 999)).toBe('locked');
     expect(nodeState(node('tower:archer'), owned, 999)).toBe('hidden');
-    expect(nodeState(node('tower:stone:2'), owned, 999)).toBe('empty');
+    expect(nodeState(node('tower:stone:3'), owned, 999)).toBe('empty');
   });
 
   it('buys a node and takes its price', () => {
@@ -112,6 +112,23 @@ describe('what the web does in a run', () => {
     expect(opts.bonusDamage).toBeCloseTo(0.1);
     expect(opts.coinBonus).toBeCloseTo(0.1);
     expect(opts.wallBonus).toBeCloseTo(0.2);
+  });
+
+  it('gives the Net Thrower and Boulder Dropper some upgrades of their own', () => {
+    expect(node('tower:net:sticky').name).toBe('Net Thrower: Sticky Net');
+    expect(node('tower:net:sticky').cost).toBe(node('tower:rock:power').cost);
+    expect(webNode('tower:net:power')).toBeUndefined();
+    expect(node('unit:boulder:splash').parent).toBe('unit:boulder:speed');
+    const opts = runOptions([
+      'tower:net',
+      'tower:net:sticky',
+      'unit:boulder',
+      'unit:boulder:power',
+      'unit:boulder:speed',
+      'unit:boulder:splash',
+    ]);
+    expect(opts.towerMods!.net!.hold).toBeCloseTo(0.3);
+    expect(opts.unitMods!.boulder!.splash).toBeCloseTo(1.2);
   });
 
   it('pays more coins in later eras', () => {

@@ -99,6 +99,8 @@ describe('targeting', () => {
         maxHp: hp,
         speed: 0,
         d,
+        netUntil: 0,
+        netSlow: 1,
         ...p,
       });
     };
@@ -156,6 +158,89 @@ describe('run options (upgrade web)', () => {
     expect(stats.rate).toBeCloseTo(base.rate * 1.25);
     expect(stats.range).toBeCloseTo(base.range * 1.18);
     expect(sim.build(run, 'rock', 0.6, 3)!.level).toBe(1);
+  });
+});
+
+describe('Net Thrower', () => {
+  /** A Net Thrower next to the trail with a Grumbler and a Woolly Brute walking right past it. */
+  const setup = (bought: string[] = []) => {
+    const run = sim.createRun(1, runOptions(['tower:net', ...bought]));
+    const spot = bestSpot(run, 2)!;
+    const tower = sim.build(run, 'net', spot.x, spot.y)!;
+    let d = 0;
+    for (let k = 0, best = Infinity; k < run.map.length; k += 0.1) {
+      const p = posAt(run.map, k);
+      const dist = Math.hypot(p.x - spot.x, p.y - spot.y);
+      if (dist < best) [best, d] = [dist, k];
+    }
+    const add = (type: 'caveman' | 'mammoth', at: number) =>
+      run.enemies.push({
+        id: run.nextId++,
+        type,
+        boss: false,
+        tier: 0,
+        rank: 0,
+        hp: 1000,
+        maxHp: 1000,
+        speed: 1,
+        d: at,
+        netUntil: 0,
+        netSlow: 1,
+        ...posAt(run.map, at),
+      });
+    add('caveman', d);
+    add('mammoth', d - 0.1);
+    // Step until the first net lands.
+    for (let i = 0; i < 100 && !run.events.some((e) => e.type === 'splash'); i++) {
+      run.events.length = 0;
+      sim.step(run, 0.02);
+    }
+    return { run, tower, grumbler: run.enemies[0]!, brute: run.enemies[1]! };
+  };
+
+  it('stops Grumblers and slows Brutes for a moment', () => {
+    const { run, grumbler, brute } = setup();
+    const hold = towerDef('net').net!.hold;
+    expect(grumbler.netUntil - run.time).toBeCloseTo(hold, 1);
+    expect(grumbler.netSlow).toBe(0);
+    expect(brute.netSlow).toBe(towerDef('net').net!.toughSlow);
+    const d = grumbler.d;
+    sim.step(run, 0.5);
+    expect(grumbler.d).toBe(d);
+    // Once the net comes off, it walks again.
+    for (let i = 0; i < 40; i++) sim.step(run, 0.05);
+    expect(grumbler.d).toBeGreaterThan(d);
+  });
+
+  it('skips monsters that are already caught', () => {
+    const { run, grumbler } = setup();
+    const target = sim.findTarget(run, grumbler.x, grumbler.y, 3, 'first', (e) => e !== grumbler);
+    expect(target).toBeDefined();
+    expect(target).not.toBe(grumbler);
+  });
+
+  it('gets its own upgrades: Sticky Net, Wide Net and Super Sticky', () => {
+    const plain = sim.createRun(1, runOptions(['tower:net']));
+    const run = sim.createRun(
+      1,
+      runOptions([
+        'tower:net',
+        'tower:net:sticky',
+        'tower:net:speed',
+        'tower:net:reach',
+        'tower:net:wide',
+        'tower:net:speed2',
+        'tower:net:reach2',
+        'tower:net:sticky2',
+      ]),
+    );
+    const a = sim.towerStats(plain, 'net', 0);
+    const b = sim.towerStats(run, 'net', 0);
+    expect(b.hold).toBeCloseTo(a.hold + 0.8);
+    expect(b.splash).toBeCloseTo(a.splash * 1.25);
+    expect(b.toughSlow).toBe(0.25);
+    expect(b.dmg).toBeCloseTo(a.dmg);
+    expect(sim.towerStats(plain, 'net', 2).hold).toBeCloseTo(a.hold * 1.5);
   });
 });
 

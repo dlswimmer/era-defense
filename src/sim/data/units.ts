@@ -29,6 +29,17 @@ export const UNITS = {
     range: 5,
     rate: 1.2,
   },
+  boulder: {
+    name: 'Boulder Dropper',
+    emoji: '🪨',
+    era: 0,
+    cost: 25,
+    splash: 1.1,
+    shot: { emoji: '🪨', size: 0.5, speed: 6 },
+    dmg: 40,
+    range: 3,
+    rate: 0.35,
+  },
   boomerang: {
     name: 'Boomerang Crew',
     emoji: '🪃',

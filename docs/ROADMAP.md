@@ -44,6 +44,15 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   Relics became coins (copper, silver, gold, platinum). Pacing: about 15 hours to reach the
   Future, slower each era (`npm run balance -- campaign`).
 
+- **Net Thrower and Boulder Dropper (Nov 14):** the second Stone Age tower and defender.
+  The Net Thrower (David's idea) throws nets that stop Grumblers for a moment and slow Brutes
+  and bosses; it barely hurts, so it pairs with Rock Throwers. The Boulder Dropper heaves a
+  boulder that hits every monster near where it lands (slow, strong, good against groups).
+  Each has its own twist on the upgrade line (Sticky Net, Wide Net, Super Sticky; Quick Lift,
+  Big Splash, Long Heave). Stone Age Evolve now needs 1 upgrade per tower and defender
+  (was 2), so the era stays about 16 runs. Concept art:
+  `era-defense-screens/new-units/` in the project files.
+
 ## Decided in planning (Nov 13) — not built yet
 
 - **Long-running meta loop.** Runs stay short, but permanent progress should last months, with
@@ -70,7 +79,7 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   `enemies.ts`, `eras.ts`. Check with `npm run balance` after changes.
 - **Graphics pass, Stone Age done** (Rock Thrower, Spear Thrower, Grumbler, Woolly Brute, hut,
   trees). Get the kids' reactions, then do the next era's people and monsters in `src/art/`.
-- **Last Stand next steps:** pick the 4 defenders per era with the kids (data in
+- **Last Stand next steps:** pick the other 2 Stone Age defenders and towers, then 4 per era, with the kids (data in
   `src/sim/data/units.ts`), a 2.5D look in the graphics pass, flying enemies, wall repair.
 - **M3 rest:** heroes, base blueprints. Idea (David, not planned yet): a Time Machine that
   starts you over for a currency that boosts everything (prestige).

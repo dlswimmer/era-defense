@@ -19,7 +19,7 @@ export const WEB = {
   /** Unlocking the 2nd, 3rd and 4th tower (or defender) of an era. The 1st comes free. */
   unlock: [0, 6, 10, 15],
   /** How many upgrades every tower and defender needs before you can Evolve out of each era. */
-  gateUpgrades: [2, 2, 3, 3, 4, 4],
+  gateUpgrades: [1, 2, 3, 3, 4, 4],
   /** Towers and defenders shown per era. Empty slots are "?" until the kids pick one. */
   slots: 4,
 };
@@ -30,6 +30,10 @@ export interface StepEffect {
   rate?: number; // +share of attack speed
   range?: number; // +share of range
   mastery?: true; // towers start at level 2; defenders bring a free one to the Last Stand
+  hold?: number; // nets: + seconds a net holds
+  net?: number; // nets: + share of net size
+  grip?: true; // nets: heavy monsters and bosses slow to a crawl instead of half speed
+  splash?: number; // + share of splash size
 }
 
 export interface Step {
@@ -52,6 +56,31 @@ export const STEPS: Step[] = [
   { id: 'power3', name: 'Power III', emoji: '💥', cost: 95, effect: { dmg: 0.3 } },
   { id: 'mastery', name: 'Mastery', emoji: '⭐', cost: 150, effect: { mastery: true } },
 ];
+
+/**
+ * Some towers and defenders swap a few of the usual upgrades for their own (same place, same
+ * price). Keyed by tower or defender id, then by the id of the step it replaces.
+ */
+export const STEP_SWAPS: Record<string, Record<string, Omit<Step, 'cost'>>> = {
+  net: {
+    power: { id: 'sticky', name: 'Sticky Net', emoji: '🕸️', effect: { hold: 0.3 } },
+    power2: { id: 'wide', name: 'Wide Net', emoji: '⭕', effect: { net: 0.25 } },
+    power3: { id: 'sticky2', name: 'Super Sticky', emoji: '🕸️', effect: { hold: 0.5, grip: true } },
+  },
+  boulder: {
+    speed: { id: 'speed', name: 'Quick Lift', emoji: '⚡', effect: { rate: 0.1 } },
+    reach: { id: 'splash', name: 'Big Splash', emoji: '💥', effect: { splash: 0.2 } },
+    speed2: { id: 'speed2', name: 'Quick Lift II', emoji: '⚡', effect: { rate: 0.15 } },
+    reach2: { id: 'reach2', name: 'Long Heave', emoji: '🎯', effect: { range: 0.15 } },
+  },
+};
+
+/** The upgrade line for one tower or defender, with its swaps. */
+export const stepsFor = (owner: string): Step[] =>
+  STEPS.map((s) => {
+    const swap = STEP_SWAPS[owner]?.[s.id];
+    return swap ? { ...swap, cost: s.cost } : s;
+  });
 
 /** Camp upgrades: one line per era, straight out from the era. */
 export type CampId = 'treasure' | 'arms' | 'lucky' | 'wall';

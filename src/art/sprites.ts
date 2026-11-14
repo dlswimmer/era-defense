@@ -149,6 +149,158 @@ function drawClub(ctx: Ctx, x: number, y: number, ang: number, len: number, lw: 
   ctx.restore();
 }
 
+// ---------- the net ----------
+
+const ROPE = '#d9c39a';
+const ROPE_DARK = '#9c7a45';
+
+/** A rolled-up net held in the hand. */
+export function drawNetBall(ctx: Ctx, x: number, y: number, r: number, lw: number) {
+  circle(ctx, x, y, r);
+  fillStroke(ctx, ROPE, lw);
+  ctx.save();
+  circle(ctx, x, y, r);
+  ctx.clip();
+  ctx.strokeStyle = ROPE_DARK;
+  ctx.lineWidth = Math.max(1, r * 0.14);
+  for (let k = -2; k <= 2; k++) {
+    ctx.beginPath();
+    ctx.moveTo(x - r, y + k * r * 0.45 - r * 0.5);
+    ctx.lineTo(x + r, y + k * r * 0.45 + r * 0.5);
+    ctx.moveTo(x - r, y + k * r * 0.45 + r * 0.5);
+    ctx.lineTo(x + r, y + k * r * 0.45 - r * 0.5);
+    ctx.stroke();
+  }
+  ctx.restore();
+  circle(ctx, x, y, r);
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = OUTLINE;
+  ctx.stroke();
+  // two stone weights dangling
+  for (const [dx, dy] of [
+    [-0.6, 1.1],
+    [0.5, 1.2],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(x + dx * r * 0.6, y + r * 0.7);
+    ctx.lineTo(x + dx * r, y + dy * r);
+    ctx.strokeStyle = ROPE_DARK;
+    ctx.lineWidth = Math.max(1, r * 0.12);
+    ctx.stroke();
+    drawRock(ctx, x + dx * r, y + dy * r + r * 0.15, r * 0.28, lw * 0.7);
+  }
+}
+
+/** A net spread open (seen from a little above), centered on (x, y). `open` 0..1. */
+export function drawNetFlying(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  R: number,
+  open: number,
+  spin: number,
+  lw: number,
+) {
+  const rx = R * (0.25 + 0.75 * open);
+  const ry = rx * 0.55;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.sin(spin) * 0.15);
+  oval(ctx, 0, 0, rx, ry);
+  ctx.fillStyle = 'rgba(217,195,154,.28)';
+  ctx.fill();
+  ctx.save();
+  oval(ctx, 0, 0, rx, ry);
+  ctx.clip();
+  ctx.strokeStyle = ROPE_DARK;
+  ctx.lineWidth = Math.max(1, lw * 0.8);
+  const step = Math.max(6, R * 0.22);
+  for (let k = -6; k <= 6; k++) {
+    ctx.beginPath();
+    ctx.moveTo(-rx + k * step, -ry);
+    ctx.lineTo(rx + k * step - 2 * rx, ry * 1.6);
+    ctx.moveTo(-rx + k * step, ry);
+    ctx.lineTo(rx + k * step - 2 * rx, -ry * 1.6);
+    ctx.stroke();
+  }
+  ctx.restore();
+  oval(ctx, 0, 0, rx, ry);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = lw * 2.4;
+  ctx.stroke();
+  ctx.strokeStyle = ROPE;
+  ctx.lineWidth = lw * 1.2;
+  ctx.stroke();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU + spin * 0.3;
+    drawRock(ctx, Math.cos(a) * rx, Math.sin(a) * ry, R * 0.08, lw * 0.6);
+  }
+  ctx.restore();
+}
+
+/** A net thrown over a monster, feet at (x, y). w and h are the monster's size. */
+export function drawNetOver(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  lw: number,
+  wiggle: number,
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(wiggle * 0.06);
+  const dome = () => {
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.55, 0);
+    ctx.bezierCurveTo(-w * 0.6, -h * 1.2, w * 0.6, -h * 1.2, w * 0.55, 0);
+    ctx.closePath();
+  };
+  dome();
+  ctx.fillStyle = 'rgba(217,195,154,.22)';
+  ctx.fill();
+  ctx.save();
+  dome();
+  ctx.clip();
+  ctx.strokeStyle = ROPE_DARK;
+  ctx.lineWidth = Math.max(1.5, lw * 0.9);
+  const step = Math.max(7, w * 0.16);
+  for (let k = -12; k <= 12; k++) {
+    ctx.beginPath();
+    ctx.moveTo(k * step - h, -h);
+    ctx.lineTo(k * step + h * 0.3, h * 0.3);
+    ctx.moveTo(k * step + h, -h);
+    ctx.lineTo(k * step - h * 0.3, h * 0.3);
+    ctx.stroke();
+  }
+  ctx.restore();
+  dome();
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = lw * 2.2;
+  ctx.stroke();
+  ctx.strokeStyle = ROPE;
+  ctx.lineWidth = lw;
+  ctx.stroke();
+  for (const fx of [-0.5, -0.17, 0.17, 0.5]) drawRock(ctx, fx * w, -lw, w * 0.06, lw * 0.6);
+  ctx.restore();
+}
+
+/** A coil of rope and a folded net at the feet. */
+function drawNetPile(ctx: Ctx, s: number, lw: number) {
+  oval(ctx, 0.3 * s, -0.05 * s, 0.14 * s, 0.06 * s);
+  fillStroke(ctx, ROPE, lw);
+  oval(ctx, 0.3 * s, -0.07 * s, 0.09 * s, 0.035 * s);
+  ctx.strokeStyle = ROPE_DARK;
+  ctx.lineWidth = lw;
+  ctx.stroke();
+  oval(ctx, 0.3 * s, -0.11 * s, 0.11 * s, 0.05 * s);
+  fillStroke(ctx, ROPE, lw);
+  oval(ctx, 0.3 * s, -0.12 * s, 0.05 * s, 0.02 * s);
+  ctx.fillStyle = ROPE_DARK;
+  ctx.fill();
+}
+
 // ---------- people ----------
 
 export interface PersonLook {
@@ -159,7 +311,7 @@ export interface PersonLook {
   spot: string;
   band?: string;
   feather?: string;
-  weapon: 'rock' | 'spear';
+  weapon: 'rock' | 'spear' | 'net';
   /** A pile of rocks at their feet. */
   pile?: boolean;
 }
@@ -201,6 +353,7 @@ export function drawPerson(ctx: Ctx, s: number, look: PersonLook, pose: PersonPo
   fillStroke(ctx, '#7a4a24', lw);
   oval(ctx, 0.08 * s, -0.035 * s, 0.07 * s, 0.04 * s);
   fillStroke(ctx, '#7a4a24', lw);
+  if (look.weapon === 'net') drawNetPile(ctx, s, lw);
   if (look.pile) {
     const rocks: [number, number, number][] = [
       [0.2, -0.03, 0.06],
@@ -243,6 +396,8 @@ export function drawPerson(ctx: Ctx, s: number, look: PersonLook, pose: PersonPo
   fillStroke(ctx, look.skin, lw);
   if (look.weapon === 'rock' && holding)
     drawRock(ctx, handX + 0.02 * s, handY - 0.02 * s, 0.065 * s, lw);
+  if (look.weapon === 'net' && holding)
+    drawNetBall(ctx, handX + 0.03 * s, handY - 0.03 * s, 0.085 * s, lw);
 
   // tunic with a zigzag hem
   ctx.beginPath();
@@ -353,6 +508,217 @@ export function releasePoint(s: number): { x: number; y: number } {
     x: x * Math.cos(lean) - y * Math.sin(lean),
     y: x * Math.sin(lean) + y * Math.cos(lean) - 0.3 * s,
   };
+}
+
+// ---------- the Boulder Dropper ----------
+
+const BIG = {
+  skin: '#c98a5e',
+  dark: '#a8704a',
+  fur: '#8b6a4a',
+  furDark: '#5e452c',
+  hair: '#3b2416',
+  bone: '#efe2c4',
+};
+
+/** Arm angle (from the shoulder) through one heave: hug, lift overhead, heave, empty, pick up. */
+const HEAVE_ARM: [number, number][] = [
+  [0, 0.75],
+  [0.2, -0.4],
+  [0.42, -2.1],
+  [0.6, -0.2],
+  [0.72, 0.5],
+  [0.85, 1.25],
+  [1, 0.75],
+];
+const HEAVE_LEAN: [number, number][] = [
+  [0, 0],
+  [0.42, -0.12],
+  [0.6, 0.22],
+  [0.75, 0.08],
+  [0.88, 0.25],
+  [1, 0],
+];
+export const HEAVE_RELEASE = 0.6;
+
+function heaveHands(s: number, p: number) {
+  const a = p >= 0 ? keyframes(p, HEAVE_ARM) : 0.75;
+  const lean = p >= 0 ? keyframes(p, HEAVE_LEAN) : 0;
+  const shX = 0.06 * s;
+  const shY = -0.6 * s;
+  const len = 0.34 * s;
+  return { a, lean, hx: shX + Math.cos(a) * len, hy: shY + Math.sin(a) * len, shX, shY };
+}
+
+export function drawDropper(ctx: Ctx, s: number, p: number, t: number, pile = true) {
+  const lw = Math.max(1, s * 0.028);
+  ctx.lineJoin = 'round';
+  const bob = Math.sin(t * 2.4) * s * 0.008;
+  if (pile) {
+    for (const [px, py, pr] of [
+      [-0.42, -0.07, 0.09],
+      [-0.27, -0.07, 0.085],
+      [-0.35, -0.2, 0.08],
+    ] as const)
+      drawRock(ctx, px * s, py * s, pr * s, lw);
+  }
+  // stocky legs and big feet
+  limb(ctx, -0.1 * s, -0.32 * s, -0.11 * s, -0.06 * s, 0.13 * s, BIG.skin, lw);
+  limb(ctx, 0.12 * s, -0.32 * s, 0.13 * s, -0.06 * s, 0.13 * s, BIG.skin, lw);
+  oval(ctx, -0.08 * s, -0.04 * s, 0.1 * s, 0.05 * s);
+  fillStroke(ctx, '#6e4422', lw);
+  oval(ctx, 0.17 * s, -0.04 * s, 0.1 * s, 0.05 * s);
+  fillStroke(ctx, '#6e4422', lw);
+
+  const { a, lean, hx, hy, shX, shY } = heaveHands(s, p);
+  ctx.save();
+  ctx.translate(0, bob - 0.3 * s);
+  ctx.rotate(lean);
+  ctx.translate(0, 0.3 * s);
+
+  // back arm (darker, behind the body)
+  limb(ctx, shX - 0.08 * s, shY, hx - 0.06 * s, hy, 0.11 * s, BIG.dark, lw);
+
+  // big round body in a fur wrap over one shoulder
+  oval(ctx, 0.02 * s, -0.47 * s, 0.27 * s, 0.25 * s);
+  fillStroke(ctx, BIG.skin, lw);
+  ctx.save();
+  oval(ctx, 0.02 * s, -0.47 * s, 0.27 * s, 0.25 * s);
+  ctx.clip();
+  ctx.beginPath();
+  ctx.moveTo(-0.35 * s, -0.75 * s);
+  ctx.lineTo(-0.1 * s, -0.75 * s);
+  ctx.lineTo(0.35 * s, -0.4 * s);
+  ctx.lineTo(0.35 * s, -0.1 * s);
+  ctx.lineTo(-0.35 * s, -0.1 * s);
+  ctx.closePath();
+  fillStroke(ctx, BIG.fur, lw);
+  ctx.fillStyle = BIG.furDark;
+  for (const [x, y] of [
+    [-0.15, -0.4],
+    [0.05, -0.32],
+    [0.18, -0.4],
+    [-0.08, -0.25],
+    [0.2, -0.25],
+  ] as const) {
+    oval(ctx, x * s, y * s, 0.035 * s, 0.025 * s);
+    ctx.fill();
+  }
+  ctx.restore();
+  oval(ctx, 0.02 * s, -0.47 * s, 0.27 * s, 0.25 * s);
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = OUTLINE;
+  ctx.stroke();
+  // belt with a bone buckle
+  ctx.beginPath();
+  ctx.moveTo(-0.25 * s, -0.3 * s);
+  ctx.quadraticCurveTo(0.02 * s, -0.25 * s, 0.28 * s, -0.33 * s);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 0.04 * s;
+  ctx.stroke();
+  oval(ctx, 0.05 * s, -0.275 * s, 0.05 * s, 0.025 * s);
+  fillStroke(ctx, BIG.bone, lw * 0.8);
+
+  // head: small next to the body, big beard and brow
+  const hX = 0.08 * s;
+  const hY = -0.8 * s;
+  const hr = 0.15 * s;
+  furPath(ctx, hX - 0.02 * s, hY - 0.03 * s, hr * 1.12, hr * 1.02, 9, 0.14, 4);
+  fillStroke(ctx, BIG.hair, lw);
+  circle(ctx, hX, hY, hr);
+  fillStroke(ctx, BIG.skin, lw);
+  // beard
+  ctx.beginPath();
+  ctx.moveTo(hX - hr * 0.55, hY + hr * 0.05);
+  ctx.quadraticCurveTo(hX - hr * 0.6, hY + hr * 1.6, hX + hr * 0.35, hY + hr * 1.55);
+  ctx.quadraticCurveTo(hX + hr * 1.25, hY + hr * 1.35, hX + hr * 1.0, hY + hr * 0.2);
+  ctx.quadraticCurveTo(hX + hr * 0.45, hY + hr * 0.55, hX - hr * 0.55, hY + hr * 0.05);
+  ctx.closePath();
+  fillStroke(ctx, BIG.hair, lw);
+  // mouth peeking out of the beard: a grin when heaving
+  ctx.beginPath();
+  if (p > 0.35 && p < 0.7) {
+    oval(ctx, hX + hr * 0.5, hY + hr * 0.6, hr * 0.22, hr * 0.15);
+    fillStroke(ctx, '#7a2a20', lw * 0.7);
+  } else {
+    ctx.arc(hX + hr * 0.5, hY + hr * 0.45, hr * 0.22, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.strokeStyle = '#f2d2b0';
+    ctx.lineWidth = 0.018 * s;
+    ctx.stroke();
+  }
+  // hair on top, bone tucked in
+  ctx.beginPath();
+  ctx.moveTo(hX - hr * 1.05, hY);
+  for (let i = 0; i <= 6; i++) {
+    const ang = Math.PI + (i / 6) * Math.PI * 0.85;
+    const r = hr * (i % 2 ? 1.28 : 1.05);
+    ctx.lineTo(hX + Math.cos(ang) * r, hY + Math.sin(ang) * r);
+  }
+  ctx.quadraticCurveTo(hX, hY - hr * 0.3, hX - hr * 1.05, hY);
+  ctx.closePath();
+  fillStroke(ctx, BIG.hair, lw);
+  ctx.save();
+  ctx.translate(hX - hr * 0.3, hY - hr * 1.05);
+  ctx.rotate(-0.5);
+  limb(ctx, -hr * 0.35, 0, hr * 0.35, 0, hr * 0.12, BIG.bone, lw * 0.7);
+  for (const ex of [-0.38, 0.38]) {
+    circle(ctx, ex * hr, -hr * 0.06, hr * 0.09);
+    fillStroke(ctx, BIG.bone, lw * 0.6);
+    circle(ctx, ex * hr, hr * 0.06, hr * 0.09);
+    fillStroke(ctx, BIG.bone, lw * 0.6);
+  }
+  ctx.restore();
+  // brow, eyes, nose
+  ctx.beginPath();
+  ctx.moveTo(hX + hr * 0.05, hY - hr * 0.32);
+  ctx.lineTo(hX + hr * 0.95, hY - hr * 0.3);
+  ctx.strokeStyle = BIG.hair;
+  ctx.lineWidth = 0.04 * s;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.fillStyle = OUTLINE;
+  const blink = Math.sin(t * 1.3) > 0.97;
+  for (const ex of [0.32, 0.78]) {
+    oval(ctx, hX + ex * hr, hY - hr * 0.08, 0.018 * s, blink ? 0.004 * s : 0.026 * s);
+    ctx.fill();
+  }
+  circle(ctx, hX + hr * 1.0, hY + hr * 0.12, 0.035 * s);
+  fillStroke(ctx, BIG.skin, lw * 0.7);
+  circle(ctx, hX + hr * 0.9, hY + hr * 0.25, 0.025 * s);
+  ctx.fillStyle = 'rgba(232,110,110,.45)';
+  ctx.fill();
+
+  // the boulder, held in both hands (gone between the heave and the pick-up)
+  const holding = p < 0 || p < HEAVE_RELEASE || p > 0.86;
+  if (holding) {
+    const lift =
+      p > 0.86
+        ? keyframes(p, [
+            [0.86, 0.6],
+            [1, 1],
+          ])
+        : 1;
+    drawRock(
+      ctx,
+      hx + Math.cos(a) * 0.12 * s + 0.03 * s,
+      hy + Math.sin(a) * 0.12 * s,
+      0.16 * s * lift,
+      lw,
+    );
+  }
+  // front arm, over the boulder
+  limb(ctx, shX + 0.06 * s, shY + 0.02 * s, hx + 0.06 * s, hy + 0.02 * s, 0.115 * s, BIG.skin, lw);
+  circle(ctx, hx + 0.06 * s, hy + 0.02 * s, 0.06 * s);
+  fillStroke(ctx, BIG.skin, lw);
+  // a strain line on the arm when lifting
+  if (a < -1.5) {
+    ctx.beginPath();
+    ctx.arc(shX + 0.1 * s, shY - 0.1 * s, 0.05 * s, 0.2, 1.4);
+    ctx.strokeStyle = BIG.dark;
+    ctx.lineWidth = lw;
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // ---------- monsters ----------

@@ -2,6 +2,7 @@
 //   era:    the era index that unlocks it (see eras.js)
 //   kind:   'shot' (a projectile flies to the enemy), 'beam' (instant hit), 'chain' (zaps several enemies)
 //   splash: area damage radius in tiles (0 = single target)
+//   net:    throws nets that hold monsters for a moment instead of hurting them much
 //   levels: stats for level 1, 2 and 3. range is in tiles, rate is shots per second.
 //   by:     who designed it, shown in the game. Put a kid's name here when it's their idea!
 export interface TowerLevel {
@@ -20,6 +21,11 @@ export interface TowerDef {
   chain?: number;
   shot?: { emoji?: string; color?: string; size: number; speed: number };
   beam?: { color: string; width: number };
+  /**
+   * Nets (the splash is the net's size): normal monsters caught in one stop for `hold` seconds
+   * (+25% per tower level); the heavy ones and bosses walk at `toughSlow` × speed instead.
+   */
+  net?: { hold: number; toughSlow: number };
   levels: [TowerLevel, TowerLevel, TowerLevel];
   by?: string;
 }
@@ -37,6 +43,22 @@ export const TOWERS = {
       { dmg: 10, range: 2.4, rate: 1.4 },
       { dmg: 16, range: 2.6, rate: 1.6 },
     ],
+  },
+  net: {
+    name: 'Net Thrower',
+    emoji: '🕸️',
+    era: 0,
+    cost: 25,
+    kind: 'shot',
+    splash: 0.8,
+    net: { hold: 1.2, toughSlow: 0.5 },
+    shot: { color: '#d9c39a', size: 0.3, speed: 6 },
+    levels: [
+      { dmg: 2, range: 2.0, rate: 0.6 },
+      { dmg: 3, range: 2.2, rate: 0.7 },
+      { dmg: 5, range: 2.4, rate: 0.8 },
+    ],
+    by: 'David',
   },
   archer: {
     name: 'Archer',
