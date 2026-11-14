@@ -82,3 +82,11 @@ Why things are the way they are. Keep this current when a decision changes.
   price), e.g. Sticky Net instead of Power for the Net Thrower.
 - **Saves:** one versioned localStorage key (`eraDefense.save`), every access in try/catch.
 - **`?dev` in the URL** starts a run with 99,999 gold for testing.
+- **Bot testers** (`TESTERS` in `src/sim/playtest/bot.ts`): Optimal, Tower spammer, Upgrader,
+  Booster and Casual kid play differently (how often they shop, towers vs upgrades, sloppy
+  placement, defenders vs boosts, when they repair). Balance shouldn't only fit the perfect
+  bot; `balance.test.ts` checks every tester holds the Stone Age wall for several waves.
+- **Last Stand waves** don't start on a timer: the next one waits until the last one has walked
+  within `nextWaveWithin` of the wall. On a timer, waves piled up far away while the counter ran
+  ahead, and then one huge crowd hit the wall at once. Wall monster HP is its own curve
+  (`standHpScale`): gentler than the trail, which gets 20% tougher a wave past the era's tiers.

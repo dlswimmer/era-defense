@@ -134,6 +134,8 @@ export function createLastStandScene(game: Game): Scene {
       grid.append(btn);
     }
     for (const boost of BOOSTS) {
+      // Repair isn't an upgrade that stays: it only shows up while the wall is hurt.
+      if (boost.id === 'repair' && !st.canRepair(stand)) continue;
       const cost = st.boostCost(stand, boost);
       const level = stand.boosts[boost.id];
       const btn = el(
@@ -145,11 +147,7 @@ export function createLastStandScene(game: Game): Scene {
           { class: 'nm' },
           boost.id === 'repair' || !level ? boost.name : `${boost.name} ${level}`,
         ),
-        el(
-          'span',
-          { class: 'cost' },
-          cost === null ? (boost.id === 'repair' ? 'Full' : 'Max') : `⚔️${cost}`,
-        ),
+        el('span', { class: 'cost' }, cost === null ? 'Max' : `⚔️${cost}`),
       );
       buttons.push({
         btn,
@@ -175,12 +173,13 @@ export function createLastStandScene(game: Game): Scene {
     if (hud.wallFill.style.width !== width) hud.wallFill.style.width = width;
     hud.wallFill.classList.toggle('mid', frac <= 0.5 && frac > 0.25);
     hud.wallFill.classList.toggle('low', frac <= 0.25);
-    if (stand.queue.length || stand.over) setText(ctl.wave, `🌊 Wave ${stand.wave}`);
+    if (stand.queue.length || stand.over || st.waveWalkingIn(stand))
+      setText(ctl.wave, `🌊 Wave ${stand.wave}`);
     else setText(ctl.wave, `Next wave in ${Math.ceil(Math.max(0, stand.nextWaveIn))}…`);
     setText(ctl.speed, `${speed}×`);
     setText(ctl.pause, paused ? '▶️' : '⏸️');
-    // Repair's label flips between "Full" and a price as the wall gets hurt.
-    const repairPossible = stand.wallHp < stand.wallMax;
+    // Repair comes and goes as the wall gets hurt and fixed.
+    const repairPossible = st.canRepair(stand);
     if (repairPossible !== repairWasPossible) {
       repairWasPossible = repairPossible;
       renderShop();

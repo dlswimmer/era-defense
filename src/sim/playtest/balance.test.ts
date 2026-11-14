@@ -2,7 +2,7 @@
 // check it still feels right with the kids, then update the bands.
 import { describe, expect, it } from 'vitest';
 import { ERAS } from '../data/eras';
-import { playCampaign, playRun, playStand } from './bot';
+import { OPTIMAL, TESTERS, playCampaign, playRun, playStand } from './bot';
 
 const seeds = [1, 2, 3, 4];
 
@@ -34,6 +34,19 @@ describe('balance', () => {
       expect(r.time).toBeGreaterThan(60);
       expect(r.time).toBeLessThan(5 * 60);
       expect(r.held).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  // David: the wall went too fast ("a couple waves compared to like 7" on the trail). Every kind
+  // of player should hold the wall for several waves in the Stone Age. `npm run balance -- testers`
+  it('the Stone Age wall lasts several waves for every kind of player', () => {
+    for (const t of TESTERS) {
+      for (const seed of seeds) {
+        const r = playRun(seed, {}, 3600, t);
+        const s = playStand(seed, { era: 0, wave: r.wave, chest: r.chest }, 1800, t);
+        expect(s.held, t.name).toBeGreaterThanOrEqual(t === OPTIMAL ? 6 : 3);
+        expect(s.time, t.name).toBeLessThan(4 * 60);
+      }
     }
   });
 

@@ -188,11 +188,14 @@ export function hireMasteryBuddies(stand: Stand) {
   }
 }
 
+/** The wall is hurt (and still standing), so Repair is worth buying. */
+export const canRepair = (stand: Stand) => !stand.over && stand.wallHp < stand.wallMax;
+
 /** War Chest for the next level of a boost, or null when it's maxed (or the wall is full HP). */
 export function boostCost(stand: Stand, boost: Boost): number | null {
   const level = stand.boosts[boost.id];
   if (boost.max !== undefined && level >= boost.max) return null;
-  if (boost.id === 'repair' && stand.wallHp >= stand.wallMax) return null;
+  if (boost.id === 'repair' && !canRepair(stand)) return null;
   return Math.round(boost.cost(level) * (STAND.boostCostByEra[stand.era] ?? 1));
 }
 
@@ -227,9 +230,16 @@ export function defenderStats(stand: Stand, type: UnitId) {
 export const standWavesHeld = (stand: Stand) =>
   Math.max(0, stand.wave - stand.startWave - (stand.over ? 1 : 0));
 
-/** Coins for the Last Stand: 1 per wave held at the wall and 2 per boss stopped, scaled by the era. */
+/**
+ * Coins for the Last Stand: STAND.coinsPerWave per wave held at the wall and 2 per boss stopped,
+ * scaled by the era.
+ */
 export const standCoins = (stand: Stand) =>
-  coinsFor(standWavesHeld(stand) + 2 * stand.bosses, stand.era, stand.coinBonus);
+  coinsFor(
+    standWavesHeld(stand) * STAND.coinsPerWave + 2 * stand.bosses,
+    stand.era,
+    stand.coinBonus,
+  );
 
 // ---------- Simulation ----------
 
@@ -243,15 +253,23 @@ export function stepStand(stand: Stand, dt: number): void {
   moveShots(stand, dt);
 }
 
+/**
+ * The current wave is still walking in from far away. The next wave waits for it, so waves
+ * don't pile up out there.
+ */
+export const waveWalkingIn = (stand: Stand) =>
+  stand.enemies.some((e) => e.x > STAND.wall.front + STAND.nextWaveWithin);
+
 function waves(stand: Stand, dt: number) {
   if (stand.queue.length) {
     stand.spawnTimer -= dt;
     if (stand.spawnTimer > 0) return;
     stand.spawnTimer = stand.gap;
     spawn(stand, stand.queue.shift()!);
-    if (!stand.queue.length) stand.nextWaveIn = STAND.breather;
+    stand.nextWaveIn = STAND.breather;
     return;
   }
+  if (waveWalkingIn(stand)) return;
   stand.nextWaveIn -= dt;
   if (stand.nextWaveIn > 0) return;
   stand.wave++;
@@ -266,9 +284,19 @@ function waves(stand: Stand, dt: number) {
   });
 }
 
+/** How much tougher enemies are in the current wave at the wall (see STAND.hpGrowth). */
+export function standHpScale(stand: Stand): number {
+  const first = stand.startWave + 1;
+  const n = Math.max(0, stand.wave - first);
+  return Math.min(
+    hpScale(stand.wave, stand.era),
+    hpScale(first, stand.era) * STAND.firstHp * STAND.hpGrowth ** n,
+  );
+}
+
 function spawn(stand: Stand, sp: Spawn) {
   const def = enemyDef(sp.id);
-  const hp = Math.round(def.hp * hpScale(stand.wave, stand.era) * (sp.boss ? GAME.boss.hp : 1));
+  const hp = Math.round(def.hp * standHpScale(stand) * (sp.boss ? GAME.boss.hp : 1));
   stand.enemies.push({
     id: stand.nextId++,
     type: sp.id,

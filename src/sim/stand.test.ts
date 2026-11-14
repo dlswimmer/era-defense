@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ERAS } from './data/eras';
 import { BOOSTS, STAND, boostEffect } from './data/stand';
 import { unitDef } from './data/units';
+import { hpScale } from './data/waves';
 import * as st from './stand';
 import { NO_MODS } from './web';
 
@@ -119,6 +120,21 @@ describe('team boosts', () => {
     expect(stand.wallHp).toBe(10 + Math.round(stand.wallMax * boostEffect.repair));
   });
 
+  // David: "the repair upgrade sticks around". It's a one-off fix, not an upgrade, so it is only
+  // on offer while the wall is hurt and still standing.
+  it('repair is only on offer while the wall is hurt and standing', () => {
+    const stand = fresh(1000);
+    expect(st.canRepair(stand)).toBe(false);
+    stand.wallHp = stand.wallMax - 1;
+    expect(st.canRepair(stand)).toBe(true);
+    expect(st.buyBoost(stand, 'repair')).toBe(true);
+    expect(st.canRepair(stand)).toBe(false); // fixed: it goes away again
+    stand.wallHp = 5;
+    stand.over = true;
+    expect(st.canRepair(stand)).toBe(false);
+    expect(st.boostCost(stand, boost('repair'))).toBeNull();
+  });
+
   it('cost more in later eras', () => {
     expect(st.boostCost(fresh(0, 3), boost('power'))!).toBeGreaterThan(
       st.boostCost(fresh(0, 0), boost('power'))!,
@@ -152,6 +168,32 @@ describe('the wall', () => {
     for (let t = 0; t < 60 && !stand.over; t += 0.05) st.stepStand(stand, 0.05);
     expect(stand.kills).toBeGreaterThan(0);
     expect(stand.chest).toBeGreaterThan(chest);
+  });
+
+  it("waits for a wave to walk in before sending the next, so waves don't pile up", () => {
+    const stand = fresh(0);
+    let maxWaves = 0;
+    while (!stand.over && stand.time < 120) {
+      st.stepStand(stand, 0.05);
+      if (!stand.queue.length && st.waveWalkingIn(stand)) {
+        const waveAtStart = stand.wave;
+        st.stepStand(stand, STAND.breather + 1);
+        expect(stand.wave).toBe(waveAtStart);
+      }
+      maxWaves = stand.wave;
+    }
+    expect(maxWaves).toBeGreaterThan(stand.startWave + 1);
+  });
+
+  it('enemies at the wall start weaker than the wave that broke through, then toughen up', () => {
+    const stand = fresh(0);
+    const first = stand.startWave + 1;
+    stand.wave = first;
+    expect(st.standHpScale(stand)).toBeCloseTo(hpScale(first, 0) * STAND.firstHp);
+    stand.wave = first + 2;
+    const later = st.standHpScale(stand);
+    expect(later).toBeGreaterThan(hpScale(first, 0) * STAND.firstHp);
+    expect(later).toBeLessThanOrEqual(hpScale(first + 2, 0));
   });
 
   it('is repeatable with the same seed', () => {

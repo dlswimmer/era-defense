@@ -13,7 +13,7 @@ export const WEB = {
    * Prices in each era are multiplied by this. It grows faster than `reward`, so each era takes
    * more runs than the one before (David: early eras quick, later ones slower).
    */
-  price: [2, 40, 600, 12_000, 120_000, 900_000],
+  price: [2, 50, 600, 12_000, 120_000, 900_000],
   /** Evolving into the next era costs this × your current era's price scale. */
   evolve: 70,
   /** Unlocking the 2nd, 3rd and 4th tower (or defender) of an era. The 1st comes free. */
