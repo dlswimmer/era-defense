@@ -38,5 +38,6 @@ describe('migrate', () => {
     const m = migrate({ version: 4, coins: 55, web: ['era:ancient', 42] });
     expect(m.coins).toBe(55);
     expect(m.web).toEqual(['era:ancient']);
+    expect(m.seenUpdate).toBe(0);
   });
 });

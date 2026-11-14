@@ -5,6 +5,7 @@ import { MAPS } from '../sim/data/maps';
 import { prepareMap } from '../sim/path';
 import { coinsEl } from '../ui/coins';
 import { openIdeaBox } from '../ui/ideas';
+import { buildLabel, hasNewUpdate, openOptions } from '../ui/options';
 import { $, el, hideOverlay, showOverlay } from '../ui/dom';
 
 export function createMenuScene(game: Game): Scene {
@@ -43,13 +44,24 @@ export function createMenuScene(game: Game): Scene {
             '🕸️ Upgrades ',
             coinsEl(game.meta.coins),
           ),
-          el('button', { class: 'btn', onclick: () => openIdeaBox(game, show) }, '💡 Idea Box'),
+          el(
+            'div',
+            { class: 'row' },
+            el('button', { class: 'btn', onclick: () => openIdeaBox(game, show) }, '💡 Idea Box'),
+            el(
+              'button',
+              { class: 'btn', onclick: () => openOptions(game, show) },
+              '⚙️ Options',
+              hasNewUpdate(game) ? el('span', { class: 'dot', title: 'New update!' }) : '',
+            ),
+          ),
         ),
         el(
           'p',
           { style: 'font-size:13px;margin-top:16px' },
           'Drag a tower onto the grass to build. Stop enemies to earn 💰 gold. When one gets through, hold the wall in the Last Stand with ⚔️ War Chest defenders. Then you get coins: spend them in the upgrade web to unlock new towers and defenders, make them stronger, and Evolve!',
         ),
+        el('p', { class: 'build-label' }, buildLabel()),
       ),
     );
   };
