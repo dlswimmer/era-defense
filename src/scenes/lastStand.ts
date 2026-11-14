@@ -128,7 +128,7 @@ export function createLastStandScene(game: Game): Scene {
         { class: 'btn', onclick: () => onHire(id) },
         el('span', { class: 'em' }, def.emoji),
         el('span', { class: 'nm' }, count ? `${def.name} ×${count}` : def.name),
-        el('span', { class: 'cost' }, `⚔️${def.cost}`),
+        el('span', { class: 'cost' }, `⚔️${st.unitCost(stand, id)}`),
       );
       buttons.push({ btn, can: () => st.canHire(stand, id) });
       grid.append(btn);
@@ -198,7 +198,7 @@ export function createLastStandScene(game: Game): Scene {
     const unit = st.hire(stand, id);
     if (!unit) return;
     const p = st.seatPos(unit.seat);
-    addPopup(p.x, p.y - 0.6, p.z, `-${unitDef(id).cost}⚔️`, '#ffd34d');
+    addPopup(p.x, p.y - 0.6, p.z, `-${st.unitCost(stand, id)}⚔️`, '#ffd34d');
     if (camX > VIEW_W * 0.5) camX = 0; // show where they went
     renderShop();
   };

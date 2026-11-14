@@ -128,7 +128,7 @@ describe('what the web does in a run', () => {
       'unit:boulder:splash',
     ]);
     expect(opts.towerMods!.net!.hold).toBeCloseTo(0.3);
-    expect(opts.unitMods!.boulder!.splash).toBeCloseTo(1.2);
+    expect(opts.unitMods!.boulder!.splash).toBeCloseTo(1.1);
   });
 
   it('pays more coins in later eras', () => {

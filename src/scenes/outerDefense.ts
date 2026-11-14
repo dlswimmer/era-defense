@@ -148,9 +148,9 @@ export function createOuterDefenseScene(game: Game): Scene {
         },
         el('span', { class: 'em' }, def.emoji),
         el('span', { class: 'nm' }, def.name),
-        el('span', { class: 'cost' }, `💰${def.cost}`),
+        el('span', { class: 'cost' }, `💰${sim.towerCost(run, id)}`),
       );
-      costButtons.push({ btn, cost: () => def.cost });
+      costButtons.push({ btn, cost: () => sim.towerCost(run, id) });
       grid.append(btn);
     }
     return grid;
@@ -160,14 +160,14 @@ export function createOuterDefenseScene(game: Game): Scene {
     const def = towerDef(tower.type);
     const stats = sim.towerStats(run, tower.type, tower.level);
     const next = def.levels[tower.level + 1] && sim.towerStats(run, tower.type, tower.level + 1);
-    const upCost = sim.nextUpgradeCost(tower);
+    const upCost = sim.nextUpgradeCost(run, tower);
     const upBtn = el(
       'button',
       { class: 'btn primary', onclick: () => onUpgrade(tower) },
       upCost === null ? '⭐ Max' : `⬆️ 💰${upCost}`,
     );
     if (upCost === null) upBtn.disabled = true;
-    else costButtons.push({ btn: upBtn, cost: () => sim.nextUpgradeCost(tower) });
+    else costButtons.push({ btn: upBtn, cost: () => sim.nextUpgradeCost(run, tower) });
     const statLine = (label: string, now: number, then?: number) =>
       `${label} ${fmt(now)}${then !== undefined && then !== now ? ` → ${fmt(then)}` : ''}`;
     const aim = el(
@@ -260,7 +260,7 @@ export function createOuterDefenseScene(game: Game): Scene {
     if (run.breached) return;
     banner = null;
     if (placing?.type === id) placing = null;
-    else if (run.gold >= towerDef(id).cost) {
+    else if (run.gold >= sim.towerCost(run, id)) {
       placing = { type: id, x: 0, y: 0, show: false, dragging: true };
       selected = null;
     }
@@ -290,7 +290,7 @@ export function createOuterDefenseScene(game: Game): Scene {
       addPopup(
         x,
         y - 0.5,
-        run.gold < towerDef(type).cost ? 'Need 💰' : "Can't go there",
+        run.gold < sim.towerCost(run, type) ? 'Need 💰' : "Can't go there",
         '#ff8a8a',
       );
     }

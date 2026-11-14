@@ -18,7 +18,7 @@ export const STAND = {
   // Enemies at the wall start this much weaker than the wave that broke through (the wall gets
   // a fresh start), then get `hpGrowth` tougher each wave. Never tougher than on the trail.
   firstHp: 0.45,
-  hpGrowth: 1.25,
+  hpGrowth: 1.36,
   attackEvery: 1, // seconds between an enemy's hits on the wall
   wallDamage: { normal: 1, heavy: 3, boss: 10 },
   // Coins per wave held at the wall. Last Stands last several waves, so this keeps the

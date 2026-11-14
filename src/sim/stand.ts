@@ -163,19 +163,25 @@ export const isUnitUnlocked = (stand: Stand, type: UnitId) =>
 
 export const wallFull = (stand: Stand) => stand.defenders.length >= STAND.maxDefenders;
 
+/** What a defender costs in this Last Stand. Older-era ones cost more (GAME.oldGearPrice). */
+export function unitCost(stand: Stand, type: UnitId): number {
+  const def = unitDef(type);
+  return Math.round(def.cost * GAME.oldGearPrice.wall ** Math.max(0, stand.era - def.era));
+}
+
 export function canHire(stand: Stand, type: UnitId): boolean {
   return (
     !stand.over &&
     !wallFull(stand) &&
     isUnitUnlocked(stand, type) &&
-    stand.chest >= unitDef(type).cost
+    stand.chest >= unitCost(stand, type)
   );
 }
 
 /** Buys a defender. It takes the next free place on the wall. */
 export function hire(stand: Stand, type: UnitId, free = false): Defender | null {
   if (free ? stand.over || wallFull(stand) : !canHire(stand, type)) return null;
-  if (!free) stand.chest -= unitDef(type).cost;
+  if (!free) stand.chest -= unitCost(stand, type);
   const taken = new Set(stand.defenders.map((d) => d.seat));
   let seat = 0;
   while (taken.has(seat)) seat++;
@@ -363,22 +369,32 @@ function moveEnemies(stand: Stand, dt: number) {
 }
 
 function fire(stand: Stand, dt: number) {
+  // Damage already flying at each monster, so defenders don't all throw at one that is about to
+  // be stopped anyway (they used to, and only splash defenders were any good with a full wall).
+  const incoming = new Map<number, number>();
+  for (const s of stand.shots) incoming.set(s.targetId, (incoming.get(s.targetId) ?? 0) + s.dmg);
   for (const u of stand.defenders) {
     u.cooldown -= dt;
     if (u.cooldown > 0) continue;
     const def = unitDef(u.type);
     const stats = defenderStats(stand, u.type);
     const reach = STAND.wall.front + stats.range;
-    // Aim at whoever is closest to the wall.
+    // Aim at whoever is closest to the wall and not already done for.
     let target: Attacker | undefined;
+    let doomed: Attacker | undefined;
     for (const e of stand.enemies) {
-      if (e.hp > 0 && e.x <= reach && (!target || e.x < target.x)) target = e;
+      if (e.hp <= 0 || e.x > reach) continue;
+      if (e.hp <= (incoming.get(e.id) ?? 0)) {
+        if (!doomed || e.x < doomed.x) doomed = e;
+      } else if (!target || e.x < target.x) target = e;
     }
+    target ??= doomed;
     if (!target) {
       u.cooldown = 0;
       continue;
     }
     u.cooldown = 1 / stats.rate;
+    incoming.set(target.id, (incoming.get(target.id) ?? 0) + stats.dmg);
     const from = seatPos(u.seat);
     stand.shots.push({
       ...from,

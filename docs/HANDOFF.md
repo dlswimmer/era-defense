@@ -88,11 +88,25 @@ Why things are the way they are. Keep this current when a decision changes.
   stopped; the splash loop walks a copy of the list so new bits aren't hit by the same blast),
   `flying` (nets skip it). Both phases handle all of them (`damage` in run.ts, `hurt` in
   stand.ts).
-- **Old gear vs new** (David, Nov 14): a maxed starter from the era before should be slightly
-  better than the next era's fresh one. `src/sim/power.ts` scores a tower or defender as
-  damage × rate × (1 + splash), at tower level 3, and `power.test.ts` keeps the ratio between
-  1.03 and 1.25. The Archer, Catapult, Boomerang Crew and Boiling Oil were retuned for it, and
-  the new monsters' HP was set so pacing stayed where it was.
+- **Old gear vs new** (David, Nov 14): a maxed tower or defender from the era before should be
+  slightly (~10%) better than the next era's fresh starter, and the ones within an era about even.
+  A formula (damage × rate × splash) got this badly wrong in play, so worth is now measured by
+  playing: `src/sim/playtest/worth.ts` plays each one alone and finds the damage multiplier the
+  era's fresh starter would need to do as well (`npm run balance -- units` prints the table;
+  `worth.test.ts` locks it up to Medieval). Defenders are scored two ways, averaged: a real Last
+  Stand (War Chest, boosts) and a full wall without boosts (per wall spot).
+  What it found: (1) old gear kept its cheap old price while gold and War Chest grow each era,
+  so a maxed Rock Thrower in Ancient was worth ~2.6 Archers per gold. Now old towers and
+  defenders cost more in a newer era (`GAME.oldGearPrice`, ×2.8 trail, ×2.2 wall per era
+  behind; upgrades too). (2) At the wall all defenders threw at the same closest monster, so
+  single-target defenders wasted most throws and splash ones won. Now they skip a monster that
+  enough damage is already flying at. (3) The Catapult was too weak for its price (Medieval only
+  worked with cheap old towers as filler), the Boulder Dropper was weak fresh and too strong
+  maxed (its Powers and Quick Lift II are smaller now), Boiling Oil was too weak.
+  The bot builds the newest era's towers first now, since old ones are dear, not better.
+  Wall monsters grow 36% a wave (was 25%) because the wall got stronger, and web prices for the
+  first three eras went up ~20-30% to keep runs per era (17 / 26 / 36); runs are a bit longer,
+  so hours went up (Stone Age ~1h25, Medieval done at ~7h30).
 - **Upgrade swaps:** every tower and defender gets the same 8-step line, but
   `STEP_SWAPS` in `src/sim/data/web.ts` can replace steps for one of them (same place and
   price), e.g. Sticky Net instead of Power for the Net Thrower.

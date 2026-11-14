@@ -62,8 +62,13 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   they get a new color, a new crest color, a shield, then spikes. Waves only use the run's own
   era's monsters now; a later era's warm-up waves are as tough as the era before's. Starters
   follow David's rule: a maxed starter from the era before is slightly (about 10%) better than
-  the next era's fresh starter (`src/sim/power.ts`). Pacing stays about the same (Stone Age 17
+  the next era's fresh starter. Pacing stays about the same (Stone Age 17
   runs, Ancient 25, Medieval 37). The other 3 towers and defenders per era are still for the kids.
+- **Unit balance (Nov 14).** Worth is measured by bots playing each tower and defender alone
+  (`npm run balance -- units`). Old-era gear costs more in a newer era, defenders stop
+  doubling up on one monster, and the Boulder Dropper, Catapult and Boiling Oil were retuned:
+  maxed old ones are now ~0-25% better than the next starter instead of 2-3×. Runs per era held
+  (17 / 26 / 36); each run is a bit longer.
 
 - **New monsters for Ancient and Medieval (David, Nov 14):** two per era that play differently,
   next to the armored Grumblers and Brutes. Ancient: the Scarab Scuttler (small, fast, comes in
@@ -82,7 +87,8 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   just 1 tower and 1 unit when you enter an era and unlock the rest one at a time.
 - **Older-era towers/units stay usable** but are weaker. David (Nov 14): a maxed tower or
   defender from the era before is slightly better than the next era's fresh starter
-  (`power.test.ts` checks it for each era that has been tuned).
+  (`worth.test.ts` checks it by playing, for each era that has been tuned). Older gear costs
+  more in a newer era (`GAME.oldGearPrice`).
 - **Harder maps for later.** Once players have strong upgrades, new harder maps (shorter
   trails, more bends to cover) keep Phase 1 short instead of letting it run for 20 minutes.
   A map is one entry in `src/sim/data/maps.ts`.

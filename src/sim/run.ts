@@ -193,18 +193,24 @@ export function towerStats(run: Run, type: TowerId, level: number) {
 /** The level (0-based) a new tower starts at: Mastery skips the first one. */
 export const startLevel = (run: Run, type: TowerId) => (run.towerMods[type]?.mastery ? 1 : 0);
 
+/** What a tower costs to build in this run. Older-era towers cost more (GAME.oldGearPrice). */
+export function towerCost(run: Run, type: TowerId): number {
+  const def = towerDef(type);
+  return Math.round(def.cost * GAME.oldGearPrice.trail ** Math.max(0, run.era - def.era));
+}
+
 export function canBuild(run: Run, type: TowerId, x: number, y: number): boolean {
   return (
     !run.breached &&
     isUnlocked(run, type) &&
-    run.gold >= towerDef(type).cost &&
+    run.gold >= towerCost(run, type) &&
     isBuildable(run, x, y)
   );
 }
 
 export function build(run: Run, type: TowerId, x: number, y: number): Tower | null {
   if (!canBuild(run, type, x, y)) return null;
-  const cost = towerDef(type).cost;
+  const cost = towerCost(run, type);
   run.gold -= cost;
   const tower: Tower = {
     id: run.nextId++,
@@ -220,13 +226,13 @@ export function build(run: Run, type: TowerId, x: number, y: number): Tower | nu
   return tower;
 }
 
-export function nextUpgradeCost(tower: Tower): number | null {
+export function nextUpgradeCost(run: Run, tower: Tower): number | null {
   if (tower.level >= 2) return null;
-  return upgradeCost(towerDef(tower.type), tower.level);
+  return upgradeCost(towerCost(run, tower.type), tower.level);
 }
 
 export function upgrade(run: Run, tower: Tower): boolean {
-  const cost = nextUpgradeCost(tower);
+  const cost = nextUpgradeCost(run, tower);
   if (cost === null || run.gold < cost || run.breached) return false;
   run.gold -= cost;
   tower.spent += cost;

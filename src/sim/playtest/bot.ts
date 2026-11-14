@@ -28,6 +28,7 @@ import {
   standCoins,
   standWavesHeld,
   stepStand,
+  unitCost,
   type Stand,
   type StandOptions,
 } from '../stand';
@@ -156,7 +157,7 @@ export function netSpot(run: sim.Run, range: number): Point | null {
 export function spend(run: sim.Run, tester = OPTIMAL, sloppy?: Rng) {
   for (let guard = 0; guard < 100; guard++) {
     const upgradable = run.towers
-      .map((t) => ({ t, cost: sim.nextUpgradeCost(t) }))
+      .map((t) => ({ t, cost: sim.nextUpgradeCost(run, t) }))
       .filter((u): u is { t: sim.Tower; cost: number } => u.cost !== null && u.cost <= run.gold)
       .sort((a, b) => a.cost - b.cost)[0];
     if (upgradable && tester.towers === 'upgrade' && run.towers.length >= 2) {
@@ -166,13 +167,14 @@ export function spend(run: sim.Run, tester = OPTIMAL, sloppy?: Rng) {
     const options = TOWER_IDS.filter(
       (id) =>
         sim.isUnlocked(run, id) &&
-        run.gold >= towerDef(id).cost &&
+        run.gold >= sim.towerCost(run, id) &&
         // Nets only help next to towers that hit hard, so build a couple once there are some.
         (!towerDef(id).net ||
           (run.towers.length >= 3 && run.towers.filter((t) => t.type === id).length < 2)),
     );
     const pick: TowerId | undefined = options.sort(
-      (a, b) => towerDef(b).cost - towerDef(a).cost,
+      // The newest era's towers first (old ones cost more but aren't better), then the dearest.
+      (a, b) => towerDef(b).era - towerDef(a).era || sim.towerCost(run, b) - sim.towerCost(run, a),
     )[0];
     if (pick && run.towers.length < 24) {
       const spot = towerDef(pick).net
@@ -233,7 +235,9 @@ export function spendStand(stand: Stand, tester = OPTIMAL) {
     const hurt = stand.wallHp < stand.wallMax * tester.repairAt;
     if (hurt && buyBoost(stand, 'repair')) continue;
     const pick = UNIT_IDS.filter((id) => canHire(stand, id)).sort((a, b) =>
-      tester.cheap ? unitDef(a).cost - unitDef(b).cost : unitDef(b).cost - unitDef(a).cost,
+      tester.cheap
+        ? unitCost(stand, a) - unitCost(stand, b)
+        : unitDef(b).era - unitDef(a).era || unitCost(stand, b) - unitCost(stand, a),
     )[0];
     // A booster keeps a couple of defenders and puts the rest into boosts.
     const wantsUnit = tester.wall !== 'boosts' || stand.defenders.length < 2;

@@ -28,6 +28,8 @@ with and for David's kids. Must work with touch in portrait on phones, and with 
 - After balance changes, run `npm run balance`; `src/sim/playtest/balance.test.ts` locks the band.
   `npm run balance -- campaign` plays a whole campaign through the upgrade web (runs and hours per era).
   `npm run balance -- testers` compares play styles (casual kid, booster...) in the Stone Age.
+  `npm run balance -- units` plays each tower and defender alone and prints what it's worth per
+  era (old maxed vs new starter, see `src/sim/playtest/worth.test.ts`).
 - Coins are one number of copper (`src/sim/coins.ts`), shown as copper/silver/gold/platinum.
 
 ## Conventions
