@@ -4,6 +4,10 @@
 //   speed:  tiles per second
 //   gold:   gold for stopping it
 //   heavy:  the tough one of each tier. Bosses are a big version of the heavy enemy.
+//   pack:   comes in a little group of this many
+//   shell:  a shell soaks up this share of its HP in damage first; then it walks shellSpeed × faster
+//   split:  when stopped, splits into `count` of `into` (an enemy with noWave: never in a wave)
+//   flying: nets can't catch it
 //   by:     who designed it (shown in the game)
 export interface EnemyDef {
   name: string;
@@ -13,6 +17,12 @@ export interface EnemyDef {
   speed: number;
   gold: number;
   heavy?: boolean;
+  pack?: number;
+  shell?: number;
+  shellSpeed?: number;
+  split?: { into: string; count: number };
+  flying?: boolean;
+  noWave?: boolean;
   by?: string;
 }
 
@@ -30,6 +40,26 @@ export const ENEMIES = {
     gold: 8,
     heavy: true,
   },
+  scuttler: {
+    name: 'Scarab Scuttler',
+    emoji: '🪲',
+    tier: 1,
+    hp: 22,
+    speed: 1.7,
+    gold: 3,
+    pack: 2,
+  },
+  shellback: {
+    name: 'Shellback',
+    emoji: '🐢',
+    tier: 1,
+    hp: 110,
+    speed: 0.45,
+    gold: 10,
+    heavy: true,
+    shell: 1,
+    shellSpeed: 2,
+  },
   // Medieval: iron helmets, chain mail and maces.
   ironGrumbler: { name: 'Iron Grumbler', emoji: '👾', tier: 2, hp: 150, speed: 1.05, gold: 8 },
   ironBrute: {
@@ -40,6 +70,25 @@ export const ENEMIES = {
     speed: 0.6,
     gold: 12,
     heavy: true,
+  },
+  goo: {
+    name: 'Goo Knight',
+    emoji: '🟢',
+    tier: 2,
+    hp: 90,
+    speed: 0.9,
+    gold: 6,
+    split: { into: 'gooBit', count: 2 },
+  },
+  gooBit: { name: 'Goo Bit', emoji: '🟢', tier: 2, hp: 40, speed: 1.2, gold: 2, noWave: true },
+  flapper: {
+    name: 'Flapper',
+    emoji: '🦇',
+    tier: 2,
+    hp: 80,
+    speed: 1.3,
+    gold: 7,
+    flying: true,
   },
   musketeer: { name: 'Musketeer', emoji: '💂', tier: 3, hp: 170, speed: 1.1, gold: 10 },
   ship: { name: 'Pirate Ship', emoji: '⛵', tier: 3, hp: 380, speed: 0.6, gold: 18, heavy: true },

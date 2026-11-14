@@ -60,11 +60,25 @@ export function hpBar(
   w: number,
   h: number,
   frac: number,
+  color?: string,
 ) {
   ctx.fillStyle = 'rgba(0,0,0,.55)';
   ctx.fillRect(x - w / 2, y, w, h);
-  ctx.fillStyle = frac > 0.5 ? '#5fd068' : frac > 0.25 ? '#ffb547' : '#ff5d5d';
+  ctx.fillStyle = color ?? (frac > 0.5 ? '#5fd068' : frac > 0.25 ? '#ffb547' : '#ff5d5d');
   ctx.fillRect(x - w / 2, y, w * Math.max(0, frac), h);
+}
+
+/** A monster's health bar, with a bronze shell bar above it while it still has its shell. */
+export function enemyBars(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  e: { hp: number; maxHp: number; shell: number; maxShell: number; boss: boolean },
+) {
+  if (!e.boss && e.hp >= e.maxHp && e.shell >= e.maxShell) return;
+  hpBar(ctx, x, y, w, 4, e.hp / e.maxHp);
+  if (e.shell > 0) hpBar(ctx, x, y - 5, w, 4, e.shell / e.maxShell, '#d39b3a');
 }
 
 /** Mixes a #rrggbb color toward black (amount < 0) or white (amount > 0). */

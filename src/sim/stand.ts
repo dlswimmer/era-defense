@@ -7,7 +7,7 @@ import { enemyDef, type EnemyId } from './data/enemies';
 import { GAME } from './data/game';
 import { BOOSTS, STAND, boostEffect, type Boost, type BoostId } from './data/stand';
 import { unitDef, type UnitId } from './data/units';
-import { buildWave, hpScale, rankFor, type Spawn } from './data/waves';
+import { PACK_GAP, buildWave, hpScale, rankFor, type Spawn } from './data/waves';
 import { createRng, type Rng } from './rng';
 import { NO_MODS, coinsFor, type Mods } from './web';
 
@@ -37,6 +37,8 @@ export interface Attacker {
   x: number;
   z: number;
   hitTimer: number;
+  shell: number; // shell HP left (Shellbacks); damage hits it first
+  maxShell: number;
 }
 
 export interface StandShot extends Pos3 {
@@ -55,7 +57,8 @@ export type StandEvent =
   | { type: 'wallHit'; z: number; dmg: number }
   | { type: 'splash'; x: number; y: number; z: number; radius: number }
   | { type: 'waveStart'; wave: number; boss: boolean }
-  | { type: 'fallen' };
+  | { type: 'fallen' }
+  | { type: 'shell'; x: number; y: number; z: number };
 
 export interface Stand {
   rng: Rng;
@@ -264,8 +267,8 @@ function waves(stand: Stand, dt: number) {
   if (stand.queue.length) {
     stand.spawnTimer -= dt;
     if (stand.spawnTimer > 0) return;
-    stand.spawnTimer = stand.gap;
     spawn(stand, stand.queue.shift()!);
+    stand.spawnTimer = stand.queue[0]?.quick ? PACK_GAP : stand.gap;
     stand.nextWaveIn = STAND.breather;
     return;
   }
@@ -295,21 +298,42 @@ export function standHpScale(stand: Stand): number {
 }
 
 function spawn(stand: Stand, sp: Spawn) {
-  const def = enemyDef(sp.id);
-  const hp = Math.round(def.hp * standHpScale(stand) * (sp.boss ? GAME.boss.hp : 1));
-  stand.enemies.push({
+  stand.enemies.push(
+    makeAttacker(
+      stand,
+      sp.id,
+      sp.boss,
+      STAND.spawnX + stand.rng.next() * 0.5,
+      sp.boss ? STAND.depth / 2 : 0.3 + stand.rng.next() * (STAND.depth - 0.6),
+    ),
+  );
+}
+
+export function makeAttacker(
+  stand: Stand,
+  type: EnemyId,
+  boss: boolean,
+  x: number,
+  z: number,
+): Attacker {
+  const def = enemyDef(type);
+  const hp = Math.round(def.hp * standHpScale(stand) * (boss ? GAME.boss.hp : 1));
+  const shell = Math.round(hp * (def.shell ?? 0));
+  return {
     id: stand.nextId++,
-    type: sp.id,
-    boss: sp.boss,
+    type,
+    boss,
     tier: def.tier,
     rank: rankFor(stand.wave, stand.era),
     hp,
     maxHp: hp,
-    speed: def.speed * STAND.enemySpeed * (sp.boss ? 0.8 : 1),
-    x: STAND.spawnX + stand.rng.next() * 0.5,
-    z: sp.boss ? STAND.depth / 2 : 0.3 + stand.rng.next() * (STAND.depth - 0.6),
+    speed: def.speed * STAND.enemySpeed * (boss ? 0.8 : 1),
+    x,
+    z,
     hitTimer: 0,
-  });
+    shell,
+    maxShell: shell,
+  };
 }
 
 function moveEnemies(stand: Stand, dt: number) {
@@ -386,7 +410,7 @@ function moveShots(stand: Stand, dt: number) {
     const move = s.speed * dt;
     if (dist <= move || dist < 0.05) {
       if (s.splash > 0) {
-        for (const e of stand.enemies)
+        for (const e of [...stand.enemies])
           if (Math.hypot(e.x - s.tx, e.z - s.tz) <= s.splash) hurt(stand, e, s.dmg);
         stand.events.push({ type: 'splash', x: s.tx, y: s.ty, z: s.tz, radius: s.splash });
       } else if (target) hurt(stand, target, s.dmg);
@@ -401,10 +425,25 @@ function moveShots(stand: Stand, dt: number) {
   stand.enemies = stand.enemies.filter((e) => e.hp > 0);
 }
 
-function hurt(stand: Stand, e: Attacker, dmg: number) {
+export function hurt(stand: Stand, e: Attacker, dmg: number) {
   if (e.hp <= 0) return;
+  const def = enemyDef(e.type);
+  if (e.shell > 0) {
+    e.shell -= dmg;
+    if (e.shell > 0) return;
+    dmg = -e.shell;
+    e.shell = 0;
+    e.speed *= def.shellSpeed ?? 1;
+    stand.events.push({ type: 'shell', x: e.x, y: enemyY(e), z: e.z });
+  }
   e.hp -= dmg;
   if (e.hp > 0) return;
+  if (def.split) {
+    for (let k = 0; k < def.split.count; k++) {
+      const z = Math.min(STAND.depth - 0.3, Math.max(0.3, e.z + (k ? 0.35 : -0.35)));
+      stand.enemies.push(makeAttacker(stand, def.split.into as EnemyId, false, e.x + 0.2 * k, z));
+    }
+  }
   const chest = GAME.warChest.perKill(e.tier) + (e.boss ? GAME.warChest.perBoss(e.tier) : 0);
   stand.chest += chest;
   stand.kills++;

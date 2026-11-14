@@ -15,7 +15,7 @@ import {
 } from '../art/cast';
 import { Puffs, RELEASE, drawShadow } from '../art/sprites';
 import type { Game, RunSummary, Scene } from '../game';
-import { emoji, fitCanvas, hpBar, shade, text } from '../render';
+import { emoji, enemyBars, fitCanvas, hpBar, shade, text } from '../render';
 import { saveMeta } from '../save';
 import { ERAS, type Era } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
@@ -231,6 +231,10 @@ export function createLastStandScene(game: Game): Scene {
           break;
         case 'waveStart':
           banner = { text: ev.boss ? `👑 Boss wave ${ev.wave}!` : `Wave ${ev.wave}`, t: 0 };
+          break;
+        case 'shell':
+          puffs.hit(sx(ev.x, ev.z), sy(ev.y, ev.z), tile * 0.6);
+          addPopup(ev.x, ev.y - 0.5, ev.z, 'Crack!', '#d39b3a', 0.3);
           break;
         case 'fallen':
           fallTimer = 0;
@@ -607,10 +611,9 @@ export function createLastStandScene(game: Game): Scene {
         ctx.translate(ex, feet);
         ctx.scale(-1, 1);
         if (hitFlash.has(e.id)) ctx.scale(1.1, 0.92);
-        drawEnemyArt(ctx, e.type, s, { walk: step, attack }, e.boss, e.rank);
+        drawEnemyArt(ctx, e.type, s, { walk: step, attack }, e.boss, e.rank, e.shell > 0);
         ctx.restore();
-        if (e.boss || e.hp < e.maxHp)
-          hpBar(ctx, ex, feet - s * enemyArtHeight(e.type) - 8, s * 0.7, 4, e.hp / e.maxHp);
+        enemyBars(ctx, ex, feet - s * enemyArtHeight(e.type) - 8, s * 0.7, e);
         continue;
       }
       const lean = atWall ? -0.35 * Math.max(0, (e.hitTimer / STAND.attackEvery - 0.6) * 2.5) : 0;

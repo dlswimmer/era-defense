@@ -9,7 +9,7 @@ import {
 } from '../art/cast';
 import { Puffs, RELEASE as RELEASE_AT, drawNetOver, drawShadow } from '../art/sprites';
 import type { Game, RunSummary, Scene } from '../game';
-import { emoji, fitCanvas, hpBar, drawMap, text } from '../render';
+import { emoji, enemyBars, fitCanvas, hpBar, drawMap, text } from '../render';
 import { saveMeta } from '../save';
 import { ERAS } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
@@ -494,12 +494,11 @@ export function createOuterDefenseScene(game: Game): Scene {
       ctx.translate(ex, feet);
       ctx.scale(facing.get(e.id) ?? 1, 1);
       if (flash) ctx.scale(1.1, 0.92);
-      drawEnemyArt(ctx, e.type, s, { walk: step, attack: null }, e.boss, e.rank);
+      drawEnemyArt(ctx, e.type, s, { walk: step, attack: null }, e.boss, e.rank, e.shell > 0);
       ctx.restore();
       const tall = enemyArtHeight(e.type);
-      caughtNet(ctx, e, ex, feet, s * (tall < 1 ? 1.5 : 0.85), s * tall * 1.02);
-      if (e.boss || e.hp < e.maxHp)
-        hpBar(ctx, ex, feet - s * enemyArtHeight(e.type) - 8, s * 0.7, 4, e.hp / e.maxHp);
+      caughtNet(ctx, e, ex, feet, s * (def.heavy ? 1.5 : 0.85), s * tall * 1.02);
+      enemyBars(ctx, ex, feet - s * tall - 8, s * 0.7, e);
       return;
     }
     const size = tile * 0.62 * (e.boss ? GAME.boss.size : 1);
@@ -558,6 +557,10 @@ export function createOuterDefenseScene(game: Game): Scene {
           showBanner(
             `${ev.boss ? `👑 Boss wave ${ev.wave}!` : `Wave ${ev.wave}`}${ev.bonus ? `  +${ev.bonus}💰` : ''}`,
           );
+          break;
+        case 'shell':
+          puffs.hit(ev.x * tile, ev.y * tile, tile * 0.5);
+          addPopup(ev.x, ev.y - 0.5, 'Crack!', '#d39b3a', 0.26);
           break;
         case 'breach':
           breachTimer = 0;

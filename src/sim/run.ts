@@ -6,7 +6,7 @@ import { GAME } from './data/game';
 import { MAPS } from './data/maps';
 import { NO_MODS, coinsFor, type Mods, type RunOptions } from './web';
 import { towerDef, upgradeCost, sellValue, type TowerId } from './data/towers';
-import { buildWave, hpScale, rankFor, WAVES, type Spawn } from './data/waves';
+import { buildWave, hpScale, PACK_GAP, rankFor, WAVES, type Spawn } from './data/waves';
 import { distToTrail, posAt, prepareMap, type Point, type PreparedMap } from './path';
 import { createRng, type Rng } from './rng';
 
@@ -39,6 +39,8 @@ export interface Enemy {
   y: number;
   netUntil: number; // caught in a net until this time (run.time)
   netSlow: number; // speed × while caught
+  shell: number; // shell HP left (Shellbacks); damage hits it first
+  maxShell: number;
 }
 
 export interface Shot {
@@ -62,7 +64,8 @@ export type SimEvent =
   | { type: 'beam'; tower: TowerId; points: Point[] }
   | { type: 'splash'; x: number; y: number; radius: number; net?: boolean }
   | { type: 'waveStart'; wave: number; boss: boolean; bonus: number }
-  | { type: 'breach' };
+  | { type: 'breach' }
+  | { type: 'shell'; x: number; y: number };
 
 export interface Run {
   map: PreparedMap;
@@ -297,26 +300,33 @@ function spawnEnemies(run: Run, dt: number) {
   if (!run.queue.length) return;
   run.spawnTimer -= dt;
   if (run.spawnTimer > 0) return;
-  run.spawnTimer = run.gap;
   const spawn = run.queue.shift()!;
-  const def = enemyDef(spawn.id);
-  const hp = Math.round(def.hp * hpScale(run.wave, run.era) * (spawn.boss ? GAME.boss.hp : 1));
-  const start = posAt(run.map, 0);
-  run.enemies.push({
+  run.spawnTimer = run.queue[0]?.quick ? PACK_GAP : run.gap;
+  run.enemies.push(makeEnemy(run, spawn.id, spawn.boss, 0));
+}
+
+export function makeEnemy(run: Run, type: EnemyId, boss: boolean, d: number): Enemy {
+  const def = enemyDef(type);
+  const hp = Math.round(def.hp * hpScale(run.wave, run.era) * (boss ? GAME.boss.hp : 1));
+  const shell = Math.round(hp * (def.shell ?? 0));
+  const p = posAt(run.map, d);
+  return {
     id: run.nextId++,
-    type: spawn.id,
-    boss: spawn.boss,
+    type,
+    boss,
     tier: def.tier,
     rank: rankFor(run.wave, run.era),
     hp,
     maxHp: hp,
-    speed: def.speed * GAME.enemySpeed * (spawn.boss ? 0.8 : 1),
-    d: 0,
+    speed: def.speed * GAME.enemySpeed * (boss ? 0.8 : 1),
+    d,
     netUntil: 0,
     netSlow: 1,
-    x: start.x,
-    y: start.y,
-  });
+    shell,
+    maxShell: shell,
+    x: p.x,
+    y: p.y,
+  };
 }
 
 function moveEnemies(run: Run, dt: number) {
@@ -370,7 +380,14 @@ function fireTowers(run: Run, dt: number) {
     const dmg = stats.dmg;
     // Nets skip monsters that are already caught, so a throw is never wasted.
     const target = def.net
-      ? findTarget(run, x, y, stats.range, t.targeting, (e) => run.time >= e.netUntil - 0.3)
+      ? findTarget(
+          run,
+          x,
+          y,
+          stats.range,
+          t.targeting,
+          (e) => !enemyDef(e.type).flying && run.time >= e.netUntil - 0.3,
+        )
       : findTarget(run, x, y, stats.range, t.targeting);
     if (!target) {
       t.cooldown = 0;
@@ -442,10 +459,10 @@ function moveShots(run: Run, dt: number) {
     const move = s.speed * dt;
     if (dist <= move || dist < 0.05) {
       if (s.splash > 0) {
-        for (const e of run.enemies) {
+        for (const e of [...run.enemies]) {
           if (Math.hypot(e.x - s.tx, e.y - s.ty) > s.splash) continue;
           damage(run, e, s.dmg);
-          if (s.hold > 0) {
+          if (s.hold > 0 && !enemyDef(e.type).flying) {
             e.netSlow = e.boss || enemyDef(e.type).heavy ? s.toughSlow : 0;
             e.netUntil = run.time + s.hold;
           }
@@ -470,11 +487,27 @@ function moveShots(run: Run, dt: number) {
   run.enemies = run.enemies.filter((e) => e.hp > 0);
 }
 
-function damage(run: Run, e: Enemy, dmg: number) {
+export function damage(run: Run, e: Enemy, dmg: number) {
   if (e.hp <= 0) return;
+  const def = enemyDef(e.type);
+  if (e.shell > 0) {
+    // The shell soaks it up first. When it cracks, the monster hurries on without it.
+    e.shell -= dmg;
+    if (e.shell > 0) return;
+    dmg = -e.shell;
+    e.shell = 0;
+    e.speed *= def.shellSpeed ?? 1;
+    run.events.push({ type: 'shell', x: e.x, y: e.y });
+  }
   e.hp -= dmg;
   if (e.hp > 0) return;
-  const def = enemyDef(e.type);
+  if (def.split) {
+    // Splits into little ones, a step apart, right where it was stopped.
+    for (let k = 0; k < def.split.count; k++)
+      run.enemies.push(
+        makeEnemy(run, def.split.into as EnemyId, false, Math.max(0, e.d - 0.25 * k)),
+      );
+  }
   const gold = def.gold * (e.boss ? GAME.boss.gold : 1);
   const chest = GAME.warChest.perKill(e.tier) + (e.boss ? GAME.warChest.perBoss(e.tier) : 0);
   run.gold += gold;
