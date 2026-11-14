@@ -63,6 +63,8 @@ describe('Boulder Dropper', () => {
         x: STAND.wall.front + 1.5,
         z,
         hitTimer: 0,
+        shell: 0,
+        maxShell: 0,
       });
     }
     for (let i = 0; i < 100 && !stand.events.some((e) => e.type === 'splash'); i++) {

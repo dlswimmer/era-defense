@@ -101,6 +101,8 @@ describe('targeting', () => {
         d,
         netUntil: 0,
         netSlow: 1,
+        shell: 0,
+        maxShell: 0,
         ...p,
       });
     };
@@ -186,6 +188,8 @@ describe('Net Thrower', () => {
         d: at,
         netUntil: 0,
         netSlow: 1,
+        shell: 0,
+        maxShell: 0,
         ...posAt(run.map, at),
       });
     add('caveman', d);

@@ -65,6 +65,12 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   the next era's fresh starter (`src/sim/power.ts`). Pacing stays about the same (Stone Age 17
   runs, Ancient 25, Medieval 37). The other 3 towers and defenders per era are still for the kids.
 
+- **New monsters for Ancient and Medieval (David, Nov 14):** two per era that play differently,
+  next to the armored Grumblers and Brutes. Ancient: the Scarab Scuttler (small, fast, comes in
+  pairs) and the Shellback (a bronze shell soaks up the first hits, then it hurries). Medieval:
+  the Goo Knight (splits into two Goo Bits when stopped) and the Flapper (flies, so nets can't
+  catch it). Shields show as a bronze bar over the health bar. Pacing barely moved.
+
 ## Decided in planning (Nov 13) — not built yet
 
 - **Long-running meta loop.** Runs stay short, but permanent progress should last months, with

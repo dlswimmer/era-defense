@@ -18,6 +18,10 @@ import {
   drawWheat,
   type Armor,
   drawBoulder,
+  drawFlapper,
+  drawGoo,
+  drawScuttler,
+  drawShellback,
   drawBrute,
   drawBush,
   drawDropper,
@@ -163,7 +167,9 @@ export function drawUnitArt(
 }
 
 /** Which monster, and how armored it is (each era adds better armor to the same monsters). */
-type MonsterArt = { kind: 'grumbler' | 'brute'; armor: Armor };
+type MonsterArt =
+  | { kind: 'grumbler' | 'brute'; armor: Armor }
+  | { kind: 'scuttler' | 'shellback' | 'goo' | 'gooBit' | 'flapper' };
 const ENEMY_ART: Partial<Record<EnemyId, MonsterArt>> = {
   caveman: { kind: 'grumbler', armor: 0 },
   mammoth: { kind: 'brute', armor: 0 },
@@ -171,6 +177,11 @@ const ENEMY_ART: Partial<Record<EnemyId, MonsterArt>> = {
   bronzeBrute: { kind: 'brute', armor: 1 },
   ironGrumbler: { kind: 'grumbler', armor: 2 },
   ironBrute: { kind: 'brute', armor: 2 },
+  scuttler: { kind: 'scuttler' },
+  shellback: { kind: 'shellback' },
+  goo: { kind: 'goo' },
+  gooBit: { kind: 'gooBit' },
+  flapper: { kind: 'flapper' },
 };
 
 export const hasEnemyArt = (id: EnemyId) => ENEMY_ART[id] !== undefined;
@@ -186,10 +197,21 @@ export function drawEnemyArt(
   pose: MonsterPose,
   boss: boolean,
   rank = 0,
+  shelled = true,
 ): boolean {
   const art = ENEMY_ART[id];
-  if (art?.kind === 'grumbler') drawGrumbler(ctx, s, pose, rank, art.armor);
-  else if (art?.kind === 'brute') {
+  if (!art) return false;
+  if (art.kind === 'grumbler') drawGrumbler(ctx, s, pose, rank, art.armor);
+  else if (art.kind === 'scuttler') drawScuttler(ctx, s, pose, rank);
+  else if (art.kind === 'shellback') {
+    ctx.save();
+    ctx.translate(-0.08 * s, 0);
+    drawShellback(ctx, s, pose, rank, shelled);
+    ctx.restore();
+  } else if (art.kind === 'goo' || art.kind === 'gooBit')
+    drawGoo(ctx, s, pose, rank, art.kind === 'gooBit');
+  else if (art.kind === 'flapper') drawFlapper(ctx, s, pose, rank);
+  else if (art.kind === 'brute') {
     ctx.save();
     ctx.translate(-0.14 * s, 0); // its middle, so it sits centered on its spot
     drawBrute(ctx, s, pose, boss, rank, art.armor);
@@ -199,7 +221,15 @@ export function drawEnemyArt(
 }
 
 /** How tall an enemy is drawn, as a share of `s`. Used to place health bars. */
-export const enemyArtHeight = (id: EnemyId) => (ENEMY_ART[id]?.kind === 'brute' ? 0.95 : 1);
+const ART_HEIGHT: Partial<Record<MonsterArt['kind'], number>> = {
+  brute: 0.95,
+  scuttler: 0.55,
+  shellback: 0.65,
+  goo: 0.65,
+  gooBit: 0.42,
+  flapper: 0.95,
+};
+export const enemyArtHeight = (id: EnemyId) => ART_HEIGHT[ENEMY_ART[id]?.kind ?? 'grumbler'] ?? 1;
 
 /**
  * The thing a tower or defender throws, centered on (x, y). `angle` spins it (or points it, for

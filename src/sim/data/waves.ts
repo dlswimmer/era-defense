@@ -39,7 +39,9 @@ export function rankFor(wave: number, maxTier = MAX_TIER): number {
 
 /** The HP of a tier's normal (not heavy) monster, to compare how tough tiers are. */
 const tierHp = (t: number) => {
-  const id = ENEMY_IDS.find((e) => enemyDef(e).tier === t && !enemyDef(e).heavy);
+  const id = ENEMY_IDS.find(
+    (e) => enemyDef(e).tier === t && !enemyDef(e).heavy && !enemyDef(e).noWave,
+  );
   return id ? enemyDef(id).hp : 1;
 };
 
@@ -65,14 +67,20 @@ export function hpScale(wave: number, maxTier = MAX_TIER): number {
 export interface Spawn {
   id: EnemyId;
   boss: boolean;
+  /** Comes right behind the one before (part of a pack). */
+  quick?: boolean;
 }
+
+/** Seconds between a pack's members. */
+export const PACK_GAP = 0.22;
 
 export interface Wave {
   gap: number;
   spawns: Spawn[];
 }
 
-const ofTier = (t: number) => ENEMY_IDS.filter((id) => enemyDef(id).tier === t);
+const ofTier = (t: number) =>
+  ENEMY_IDS.filter((id) => enemyDef(id).tier === t && !enemyDef(id).noWave);
 
 /** Builds wave n (1-based). */
 export function buildWave(n: number, rng: Rng, maxTier = MAX_TIER): Wave {
@@ -86,6 +94,9 @@ export function buildWave(n: number, rng: Rng, maxTier = MAX_TIER): Wave {
     if (heavy.length && i % 3 === 2) id = rng.pick(heavy);
     else id = rng.pick(light.length ? light : pool);
     spawns.push({ id, boss: false });
+    // A pack comes right behind the first one, and counts toward the wave's size.
+    for (let k = 1; k < (enemyDef(id).pack ?? 1); k++, i++)
+      spawns.push({ id, boss: false, quick: true });
   }
   if (n % WAVES.bossEvery === 0)
     spawns.push({ id: rng.pick(heavy.length ? heavy : pool), boss: true });

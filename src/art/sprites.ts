@@ -1546,6 +1546,321 @@ export function drawBrute(
   ctx.restore();
 }
 
+// ---------- new monsters for Ancient and Medieval ----------
+
+/** Body colors by rank for the smaller monsters: the same colors as the Grumblers. */
+const smallFur = (rank: number) => furFor(GRUMBLER_FUR, rank);
+
+/** One big grumpy eye looking right, centered on (x, y). */
+function monsterEye(ctx: Ctx, x: number, y: number, r: number, rank: number, lw: number) {
+  circle(ctx, x, y, r);
+  fillStroke(ctx, '#fffaf0', lw);
+  circle(ctx, x + r * 0.38, y + r * 0.08, r * 0.5);
+  ctx.fillStyle = rank >= 3 ? '#e8a020' : OUTLINE;
+  ctx.fill();
+  circle(ctx, x + r * 0.52, y - r * 0.08, r * 0.15);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x - r * 1.05, y - r * 1.25);
+  ctx.lineTo(x + r * 1.1, y - r * 0.65);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = r * 0.38;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+}
+
+/**
+ * The Scarab Scuttler (Ancient): a small, fast monster under a bronze beetle shell, on six
+ * scurrying legs. About half as tall as a Grumbler.
+ */
+export function drawScuttler(ctx: Ctx, s: number, pose: MonsterPose, rank = 0) {
+  const lw = Math.max(1, s * 0.03);
+  ctx.lineJoin = 'round';
+  const w = pose.attack === null ? pose.walk * 1.6 : 0;
+  const [fur, dark] = smallFur(rank);
+  // legs: three pairs, alternating
+  for (let i = 0; i < 3; i++) {
+    const lx = (-0.22 + i * 0.2) * s;
+    const sw = Math.sin(w + i * 2.1) * 0.06 * s;
+    limb(ctx, lx, -0.16 * s, lx - 0.06 * s + sw, -0.02 * s, 0.04 * s, dark, lw);
+    limb(ctx, lx + 0.03 * s, -0.16 * s, lx + 0.1 * s - sw, -0.02 * s, 0.04 * s, dark, lw);
+  }
+  const bob = -Math.abs(Math.sin(w)) * 0.025 * s;
+  ctx.save();
+  ctx.translate(0, bob);
+  // furry face peeking out in front
+  furPath(ctx, 0.24 * s, -0.24 * s, 0.17 * s, 0.15 * s, 8, 0.15, 2);
+  fillStroke(ctx, fur, lw);
+  for (const k of [0, 1]) {
+    ctx.beginPath();
+    ctx.moveTo((0.28 + k * 0.06) * s, -0.36 * s);
+    ctx.quadraticCurveTo((0.36 + k * 0.08) * s, -0.52 * s, (0.46 + k * 0.06) * s, -0.5 * s);
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 0.025 * s;
+    ctx.stroke();
+    circle(ctx, (0.46 + k * 0.06) * s, -0.5 * s, 0.025 * s);
+    fillStroke(ctx, BRONZE, lw * 0.6);
+  }
+  monsterEye(ctx, 0.29 * s, -0.27 * s, 0.075 * s, rank, lw);
+  // the shell, with a line down the middle and a shine
+  ctx.beginPath();
+  ctx.ellipse(-0.05 * s, -0.2 * s, 0.3 * s, 0.24 * s, 0, Math.PI, TAU);
+  ctx.quadraticCurveTo(-0.05 * s, -0.12 * s, -0.35 * s, -0.2 * s);
+  ctx.closePath();
+  fillStroke(ctx, rank >= 2 ? BRONZE_DARK : BRONZE, lw);
+  ctx.beginPath();
+  ctx.moveTo(-0.05 * s, -0.44 * s);
+  ctx.lineTo(-0.05 * s, -0.16 * s);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = lw;
+  ctx.stroke();
+  oval(ctx, -0.17 * s, -0.33 * s, 0.07 * s, 0.035 * s, -0.4);
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  ctx.fill();
+  if (rank >= 1) {
+    ctx.fillStyle = plumeFor(rank - 1);
+    for (const [dx, dy] of [
+      [-0.2, -0.27],
+      [0.08, -0.3],
+      [-0.12, -0.38],
+      [0.02, -0.38],
+    ] as const) {
+      circle(ctx, dx * s, dy * s, 0.03 * s);
+      ctx.fill();
+    }
+  }
+  if (rank >= 3)
+    backSpikes(
+      ctx,
+      -0.05 * s,
+      -0.2 * s,
+      0.3 * s,
+      0.24 * s,
+      Math.PI * 1.15,
+      Math.PI * 1.85,
+      3,
+      0.08 * s,
+      lw,
+      BRONZE,
+    );
+  ctx.restore();
+}
+
+/**
+ * The Shellback (Ancient): a slow, stubby monster carrying a huge bronze shell that soaks up the
+ * first hits. With `shell` false the shell has broken off and it hurries along without it.
+ */
+export function drawShellback(ctx: Ctx, s: number, pose: MonsterPose, rank = 0, shell = true) {
+  const lw = Math.max(1, s * 0.03);
+  ctx.lineJoin = 'round';
+  const w = pose.attack === null ? pose.walk * (shell ? 0.8 : 1.4) : 0;
+  const [fur, dark] = furFor(BRUTE_FUR, rank);
+  for (const [lx, ph] of [
+    [-0.28, 0],
+    [0.22, Math.PI],
+    [-0.14, Math.PI],
+    [0.34, 0],
+  ] as const) {
+    const sw = Math.sin(w + ph) * 0.05 * s;
+    oval(ctx, lx * s + sw, -0.08 * s, 0.08 * s, 0.09 * s);
+    fillStroke(ctx, dark, lw);
+  }
+  // head on a stretchy neck
+  const hx = 0.46 * s;
+  const hy = -0.36 * s + Math.sin(w) * 0.015 * s;
+  limb(ctx, 0.2 * s, -0.25 * s, hx - 0.06 * s, hy + 0.04 * s, 0.13 * s, fur, lw);
+  furPath(ctx, hx, hy, 0.15 * s, 0.13 * s, 8, 0.12, 4);
+  fillStroke(ctx, fur, lw);
+  monsterEye(ctx, hx + 0.02 * s, hy - 0.01 * s, 0.07 * s, rank, lw);
+  ctx.beginPath();
+  ctx.moveTo(hx + 0.02 * s, hy + 0.08 * s);
+  ctx.quadraticCurveTo(hx + 0.09 * s, hy + 0.1 * s, hx + 0.14 * s, hy + 0.06 * s);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 0.02 * s;
+  ctx.stroke();
+  if (shell) {
+    // a tall dome of bronze plates
+    ctx.beginPath();
+    ctx.ellipse(0, -0.16 * s, 0.42 * s, 0.4 * s, 0, Math.PI, TAU);
+    ctx.closePath();
+    fillStroke(ctx, BRONZE, lw);
+    ctx.strokeStyle = BRONZE_DARK;
+    ctx.lineWidth = 0.025 * s;
+    for (const [cx, cy] of [
+      [-0.2, -0.3],
+      [0.05, -0.36],
+      [0.26, -0.26],
+      [-0.08, -0.48],
+    ] as const) {
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) {
+        const a = (i / 6) * TAU;
+        const px = cx * s + Math.cos(a) * 0.09 * s;
+        const py = cy * s + Math.sin(a) * 0.08 * s;
+        if (i) ctx.lineTo(px, py);
+        else ctx.moveTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(-0.42 * s, -0.16 * s);
+    ctx.lineTo(0.42 * s, -0.16 * s);
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = lw * 1.5;
+    ctx.stroke();
+    oval(ctx, -0.18 * s, -0.42 * s, 0.09 * s, 0.04 * s, -0.5);
+    ctx.fillStyle = 'rgba(255,255,255,.4)';
+    ctx.fill();
+    if (rank >= 2) {
+      // a crest along the top
+      ctx.beginPath();
+      ctx.ellipse(-0.02 * s, -0.56 * s, 0.24 * s, 0.1 * s, 0, Math.PI, TAU);
+      ctx.closePath();
+      fillStroke(ctx, plumeFor(rank), lw);
+    }
+    if (rank >= 3)
+      backSpikes(
+        ctx,
+        0,
+        -0.16 * s,
+        0.42 * s,
+        0.4 * s,
+        Math.PI * 1.1,
+        Math.PI * 1.35,
+        2,
+        0.1 * s,
+        lw,
+        BRONZE,
+      );
+  } else {
+    // just a fuzzy back, a little embarrassed
+    furPath(ctx, 0, -0.2 * s, 0.32 * s, 0.2 * s, 10, 0.12, 2);
+    fillStroke(ctx, fur, lw);
+  }
+}
+
+/**
+ * The Goo Knight (Medieval): a wobbly blob of goo in a tiny iron helmet. When it's stopped it
+ * splits into two small ones (`small` draws those).
+ */
+export function drawGoo(ctx: Ctx, s: number, pose: MonsterPose, rank = 0, small = false) {
+  const lw = Math.max(1, s * 0.03);
+  const size = small ? 0.6 : 1;
+  const w = pose.attack === null ? pose.walk * 1.2 : pose.attack * TAU;
+  const squish = Math.sin(w) * 0.08;
+  const GOO = [
+    ['#6cc96a', '#3f9a44'],
+    ['#5ab8d8', '#3786a3'],
+    ['#d86ab8', '#a3418a'],
+    ['#7a62c9', '#4f3d96'],
+  ] as const;
+  const [goo, dark] = GOO[Math.min(rank, GOO.length - 1)]!;
+  ctx.save();
+  ctx.scale(size, size);
+  const rx = 0.32 * s * (1 + squish);
+  const ry = 0.3 * s * (1 - squish);
+  ctx.beginPath();
+  ctx.moveTo(-rx, 0);
+  ctx.bezierCurveTo(-rx * 1.1, -ry * 1.5, rx * 1.1, -ry * 1.5, rx, 0);
+  // drippy bottom edge
+  for (let i = 1; i <= 4; i++) {
+    const x = rx - (i / 4) * rx * 2;
+    ctx.quadraticCurveTo(x + rx * 0.25, 0.05 * s, x, 0);
+  }
+  ctx.closePath();
+  ctx.globalAlpha = 0.95;
+  fillStroke(ctx, goo, lw);
+  ctx.globalAlpha = 1;
+  // bits floating inside
+  ctx.fillStyle = dark;
+  circle(ctx, -0.12 * s, -0.12 * s, 0.035 * s);
+  ctx.fill();
+  circle(ctx, 0.14 * s, -0.08 * s, 0.025 * s);
+  ctx.fill();
+  oval(ctx, -0.14 * s, -ry * 0.95, 0.06 * s, 0.035 * s, -0.5);
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  ctx.fill();
+  monsterEye(ctx, 0.06 * s, -0.24 * s * (1 - squish), 0.09 * s, rank, lw);
+  // tiny iron helmet, tilted
+  ctx.save();
+  ctx.translate(-0.02 * s, -ry * 1.12);
+  ctx.rotate(-0.2 + squish);
+  ctx.beginPath();
+  ctx.arc(0, 0, 0.12 * s, Math.PI, TAU);
+  ctx.closePath();
+  fillStroke(ctx, IRON, lw);
+  oval(ctx, 0, 0, 0.16 * s, 0.025 * s);
+  fillStroke(ctx, IRON, lw);
+  if (rank >= 1) {
+    oval(ctx, -0.04 * s, -0.15 * s, 0.025 * s, 0.07 * s, -0.4);
+    fillStroke(ctx, plumeFor(rank - 1), lw * 0.8);
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+/**
+ * The Flapper (Medieval): a small furry monster on bat wings. It flies, so nets can't catch it.
+ * Drawn with its body about 0.55 × s above the feet point; the caller draws the shadow below.
+ */
+export function drawFlapper(ctx: Ctx, s: number, pose: MonsterPose, rank = 0) {
+  const lw = Math.max(1, s * 0.03);
+  ctx.lineJoin = 'round';
+  const w = pose.walk * 2.2;
+  const [fur, dark] = smallFur(rank);
+  const y = -0.62 * s + Math.sin(w * 0.5) * 0.05 * s;
+  const flap = Math.sin(w);
+  for (const k of [-1, 1]) {
+    // wings: the back one darker
+    ctx.save();
+    ctx.translate(k * 0.05 * s, y - 0.04 * s);
+    ctx.scale(1, k < 0 ? 1 : 1);
+    ctx.rotate(k < 0 ? -0.3 : 0.1);
+    const up = flap * 0.22 * s;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-0.15 * s, -0.2 * s - up, -0.42 * s, -0.16 * s - up);
+    ctx.quadraticCurveTo(-0.34 * s, -0.06 * s - up * 0.5, -0.36 * s, 0.02 * s - up * 0.3);
+    ctx.quadraticCurveTo(-0.24 * s, -0.04 * s, -0.22 * s, 0.06 * s);
+    ctx.quadraticCurveTo(-0.12 * s, 0.0, 0, 0.06 * s);
+    ctx.closePath();
+    fillStroke(ctx, k < 0 ? '#3a3440' : '#57505f', lw);
+    ctx.restore();
+  }
+  furPath(ctx, 0, y, 0.17 * s, 0.16 * s, 9, 0.15, 5);
+  fillStroke(ctx, fur, lw);
+  for (const k of [-1, 1]) {
+    polygon(ctx, [
+      [k * 0.08 * s - 0.03 * s, y - 0.13 * s],
+      [k * 0.11 * s, y - 0.26 * s],
+      [k * 0.08 * s + 0.04 * s, y - 0.12 * s],
+    ]);
+    fillStroke(ctx, BONE, lw * 0.8);
+  }
+  monsterEye(ctx, 0.05 * s, y - 0.01 * s, 0.075 * s, rank, lw);
+  ctx.fillStyle = '#fffaf0';
+  polygon(ctx, [
+    [0.04 * s, y + 0.09 * s],
+    [0.06 * s, y + 0.14 * s],
+    [0.08 * s, y + 0.09 * s],
+  ]);
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = lw * 0.6;
+  ctx.stroke();
+  // dangling feet
+  for (const k of [-1, 1])
+    limb(ctx, k * 0.06 * s, y + 0.14 * s, k * 0.07 * s, y + 0.22 * s, 0.035 * s, dark, lw);
+  if (rank >= 2) {
+    // a little iron cap
+    ctx.beginPath();
+    ctx.arc(-0.01 * s, y - 0.08 * s, 0.14 * s, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.closePath();
+    fillStroke(ctx, IRON, lw);
+  }
+}
+
 // ---------- scenery ----------
 
 export function drawShadow(ctx: Ctx, x: number, y: number, rx: number) {

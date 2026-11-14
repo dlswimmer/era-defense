@@ -82,6 +82,12 @@ Why things are the way they are. Keep this current when a decision changes.
 - **Monster armor** (`Armor` in `src/art/sprites.ts`): one Grumbler and one Brute drawing for
   every era, with armor 0 (fur, bone gear), 1 (bronze) or 2 (iron); `cast.ts` maps each enemy
   to a monster and an armor. Robot parts are next for the later eras.
+- **Monster tricks** are data on the enemy (`src/sim/data/enemies.ts`): `pack` (spawns in a
+  quick group, counting toward the wave size), `shell` (extra HP that is used up first, then the
+  monster speeds up by `shellSpeed`), `split` (turns into `count` of a `noWave` enemy when
+  stopped; the splash loop walks a copy of the list so new bits aren't hit by the same blast),
+  `flying` (nets skip it). Both phases handle all of them (`damage` in run.ts, `hurt` in
+  stand.ts).
 - **Old gear vs new** (David, Nov 14): a maxed starter from the era before should be slightly
   better than the next era's fresh one. `src/sim/power.ts` scores a tower or defender as
   damage × rate × (1 + splash), at tower level 3, and `power.test.ts` keeps the ratio between
