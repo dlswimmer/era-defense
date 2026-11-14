@@ -9,6 +9,7 @@ import {
   canBuyAnything,
   coinsFor,
   currentEra,
+  devSkipEra,
   eraNodeId,
   gateNodes,
   gateProgress,
@@ -135,5 +136,16 @@ describe('what the web does in a run', () => {
     expect(coinsFor(10, 0)).toBe(10);
     expect(coinsFor(10, 2)).toBe(10 * WEB.reward[2]!);
     expect(coinsFor(10, 0, 0.1)).toBe(11);
+  });
+});
+
+describe('devSkipEra', () => {
+  it('moves to the next era until the last one', () => {
+    const bought: string[] = [];
+    for (let e = 1; e < ERAS.length; e++) {
+      expect(devSkipEra(bought)).toBe(e);
+      expect(currentEra(ownedSet(bought))).toBe(e);
+    }
+    expect(devSkipEra(bought)).toBeNull();
   });
 });

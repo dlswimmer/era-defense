@@ -10,7 +10,7 @@ import {
 import { Puffs, RELEASE as RELEASE_AT, drawNetOver, drawShadow } from '../art/sprites';
 import type { Game, RunSummary, Scene } from '../game';
 import { emoji, enemyBars, fitCanvas, hpBar, drawMap, text } from '../render';
-import { saveMeta } from '../save';
+import { devGold, saveMeta } from '../save';
 import { ERAS } from '../sim/data/eras';
 import { enemyDef } from '../sim/data/enemies';
 import { GAME } from '../sim/data/game';
@@ -604,8 +604,8 @@ export function createOuterDefenseScene(game: Game): Scene {
   return {
     enter() {
       run = sim.createRun(Date.now(), runOptions(game.meta.web));
-      // Add ?dev to the URL for lots of gold (handy for testing new towers).
-      if (new URLSearchParams(location.search).has('dev')) run.gold = 99_999;
+      // ?dev in the URL or the dev mode switch: lots of gold (handy for testing new towers).
+      if (devGold(game.meta)) run.gold = 99_999;
       selected = null;
       placing = null;
       speed = 1;

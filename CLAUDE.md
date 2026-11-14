@@ -6,6 +6,8 @@ with and for David's kids. Must work with touch in portrait on phones, and with 
 ## Commands
 
 - `npm run dev`: dev server on port 5173 (exposed on LAN for testing on phones). `?dev` = lots of gold.
+- Dev mode in the game: tap the build info in ⚙️ Options 5 times. It adds coins, skips eras,
+  turns on lots of gold in runs and resets the save (`src/ui/devTools.ts`).
 - `npm test`, `npm run lint`, `npm run typecheck`, `npm run format`
 - `npm run balance`: bots play runs and report the wave/era reached.
 - Run lint, format:check, typecheck, and tests before committing; CI runs the same checks.

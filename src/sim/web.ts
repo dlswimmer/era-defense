@@ -241,6 +241,17 @@ export function canBuyAnything(bought: string[], coins: number): boolean {
   return WEB_NODES.some((n) => nodeState(n, owned, coins) === 'open');
 }
 
+/**
+ * Dev mode: jump to the next era without paying or finishing the gate.
+ * Returns the era you're now in, or null if you're already in the last one.
+ */
+export function devSkipEra(bought: string[]): number | null {
+  const next = currentEra(ownedSet(bought)) + 1;
+  if (next >= ERAS.length) return null;
+  bought.push(eraNodeId(next));
+  return next;
+}
+
 // ---------- What it does in a run ----------
 
 export interface Mods {
