@@ -73,5 +73,12 @@ Why things are the way they are. Keep this current when a decision changes.
   Enemies are monsters (easy to tell from your people, friendlier to "stop"); later eras add
   armor, then robot parts. In the Last Stand, defenders fill the front rank along the enemy
   edge first, then a second rank behind (`seatPos`).
+- **Nets** (Net Thrower): a net is a splash shot whose hits set `netUntil` on each monster
+  caught. Normal monsters stop until then; heavy ones and bosses move at `toughSlow`. Nets skip
+  monsters already caught so no throw is wasted. The bot only builds a couple, next to its
+  damage towers (`netSpot`), because a net on its own does nothing.
+- **Upgrade swaps:** every tower and defender gets the same 8-step line, but
+  `STEP_SWAPS` in `src/sim/data/web.ts` can replace steps for one of them (same place and
+  price), e.g. Sticky Net instead of Power for the Net Thrower.
 - **Saves:** one versioned localStorage key (`eraDefense.save`), every access in try/catch.
 - **`?dev` in the URL** starts a run with 99,999 gold for testing.

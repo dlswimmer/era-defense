@@ -3,7 +3,9 @@
 // War Chest and they take a place on the wall; buy team boosts to make them all stronger.
 // Draws src/sim/stand.ts.
 import {
-  UNIT_LOOKS,
+  drawUnitArt,
+  hasUnitArt,
+  unitWindup,
   drawBaseArt,
   drawDecor,
   drawEnemyArt,
@@ -11,7 +13,7 @@ import {
   enemyArtHeight,
   hasEnemyArt,
 } from '../art/cast';
-import { Puffs, RELEASE, drawPerson, drawShadow } from '../art/sprites';
+import { Puffs, RELEASE, drawShadow } from '../art/sprites';
 import type { Game, RunSummary, Scene } from '../game';
 import { emoji, fitCanvas, hpBar, shade, text } from '../render';
 import { saveMeta } from '../save';
@@ -547,7 +549,7 @@ export function createLastStandScene(game: Game): Scene {
     if (since < FOLLOW_THROUGH) return RELEASE + (1 - RELEASE) * (since / FOLLOW_THROUGH);
     const stats = st.defenderStats(stand, u.type);
     const reach = STAND.wall.front + stats.range;
-    const windup = Math.min(0.3, 0.7 / stats.rate);
+    const windup = Math.min(unitWindup(u.type), 0.7 / stats.rate);
     if (u.cooldown < windup && stand.enemies.some((e) => e.x <= reach))
       return RELEASE * (1 - Math.max(0, u.cooldown) / windup);
     return -1;
@@ -563,13 +565,12 @@ export function createLastStandScene(game: Game): Scene {
     for (const u of order) {
       const p = st.seatPos(u.seat);
       const x = sx(p.x, p.z);
-      const look = UNIT_LOOKS[u.type];
-      if (look) {
+      if (hasUnitArt(u.type)) {
         const feet = sy(STAND.wall.top, p.z);
         drawShadow(ctx, x, feet, tile * 0.3);
         ctx.save();
         ctx.translate(x, feet);
-        drawPerson(ctx, tile * PERSON_SIZE, look, { throw: throwPose(u), t: clock + u.id });
+        drawUnitArt(ctx, u.type, tile * PERSON_SIZE, throwPose(u), clock + u.id);
         ctx.restore();
         continue;
       }
@@ -781,7 +782,7 @@ export function createLastStandScene(game: Game): Scene {
         const shot = unitDef(s.unit).shot;
         const x = sx(s.x, s.z);
         const y = sy(s.y, s.z);
-        if (UNIT_LOOKS[s.unit]) {
+        if (hasUnitArt(s.unit)) {
           // Thrown in an arc: lift it by how far along it is, and point it the way it's going.
           let from = shotStart.get(s);
           if (!from) shotStart.set(s, (from = { x: s.x, y: s.y, z: s.z }));

@@ -37,6 +37,8 @@ export interface Enemy {
   d: number; // tiles walked along the path
   x: number;
   y: number;
+  netUntil: number; // caught in a net until this time (run.time)
+  netSlow: number; // speed × while caught
 }
 
 export interface Shot {
@@ -49,6 +51,8 @@ export interface Shot {
   splash: number;
   speed: number;
   tower: TowerId;
+  hold: number; // nets: seconds a monster stays caught (0 = not a net)
+  toughSlow: number;
 }
 
 /** Things that happened this step, for the screen to show (popups, beams, shakes). */
@@ -56,7 +60,7 @@ export type SimEvent =
   | { type: 'kill'; x: number; y: number; gold: number; chest: number; boss: boolean }
   | { type: 'leak'; x: number; y: number }
   | { type: 'beam'; tower: TowerId; points: Point[] }
-  | { type: 'splash'; x: number; y: number; radius: number }
+  | { type: 'splash'; x: number; y: number; radius: number; net?: boolean }
   | { type: 'waveStart'; wave: number; boss: boolean; bonus: number }
   | { type: 'breach' };
 
@@ -170,10 +174,16 @@ export const isUnlocked = (run: Run, type: TowerId) =>
 export function towerStats(run: Run, type: TowerId, level: number) {
   const base = towerDef(type).levels[level]!;
   const m = run.towerMods[type] ?? NO_MODS;
+  const def = towerDef(type);
   return {
     dmg: base.dmg * m.dmg * run.damageBonus,
     range: base.range * m.range,
     rate: base.rate * m.rate,
+    splash: (def.splash ?? 0) * m.splash * (def.net ? m.net : 1),
+    /** Nets: how long a net holds, in seconds. */
+    hold: def.net ? def.net.hold * (1 + 0.25 * level) + m.hold : 0,
+    /** Nets: speed × for heavy monsters and bosses while caught. */
+    toughSlow: def.net ? (m.grip ? 0.25 : def.net.toughSlow) : 1,
   };
 }
 
@@ -302,6 +312,8 @@ function spawnEnemies(run: Run, dt: number) {
     maxHp: hp,
     speed: def.speed * GAME.enemySpeed * (spawn.boss ? 0.8 : 1),
     d: 0,
+    netUntil: 0,
+    netSlow: 1,
     x: start.x,
     y: start.y,
   });
@@ -309,7 +321,7 @@ function spawnEnemies(run: Run, dt: number) {
 
 function moveEnemies(run: Run, dt: number) {
   for (const e of run.enemies) {
-    e.d += e.speed * dt;
+    e.d += e.speed * (run.time < e.netUntil ? e.netSlow : 1) * dt;
     const p = posAt(run.map, e.d);
     e.x = p.x;
     e.y = p.y;
@@ -330,11 +342,12 @@ export function findTarget(
   y: number,
   range: number,
   mode: Targeting = 'first',
+  want: (e: Enemy) => boolean = () => true,
 ): Enemy | undefined {
   let best: Enemy | undefined;
   let bestScore = -Infinity;
   for (const e of run.enemies) {
-    if (e.hp <= 0) continue;
+    if (e.hp <= 0 || !want(e)) continue;
     const dist = Math.hypot(e.x - x, e.y - y);
     if (dist > range) continue;
     const main = mode === 'strong' ? e.hp : mode === 'close' ? -dist : e.d;
@@ -355,7 +368,10 @@ function fireTowers(run: Run, dt: number) {
     const stats = towerStats(run, t.type, t.level);
     const { x, y } = t;
     const dmg = stats.dmg;
-    const target = findTarget(run, x, y, stats.range, t.targeting);
+    // Nets skip monsters that are already caught, so a throw is never wasted.
+    const target = def.net
+      ? findTarget(run, x, y, stats.range, t.targeting, (e) => run.time >= e.netUntil - 0.3)
+      : findTarget(run, x, y, stats.range, t.targeting);
     if (!target) {
       t.cooldown = 0;
       continue;
@@ -369,9 +385,11 @@ function fireTowers(run: Run, dt: number) {
         tx: target.x,
         ty: target.y,
         dmg,
-        splash: def.splash ?? 0,
+        splash: stats.splash,
         speed: def.shot?.speed ?? 8,
         tower: t.type,
+        hold: stats.hold,
+        toughSlow: stats.toughSlow,
       });
     } else if (def.kind === 'beam') {
       damage(run, target, dmg);
@@ -425,9 +443,20 @@ function moveShots(run: Run, dt: number) {
     if (dist <= move || dist < 0.05) {
       if (s.splash > 0) {
         for (const e of run.enemies) {
-          if (Math.hypot(e.x - s.tx, e.y - s.ty) <= s.splash) damage(run, e, s.dmg);
+          if (Math.hypot(e.x - s.tx, e.y - s.ty) > s.splash) continue;
+          damage(run, e, s.dmg);
+          if (s.hold > 0) {
+            e.netSlow = e.boss || enemyDef(e.type).heavy ? s.toughSlow : 0;
+            e.netUntil = run.time + s.hold;
+          }
         }
-        run.events.push({ type: 'splash', x: s.tx, y: s.ty, radius: s.splash });
+        run.events.push({
+          type: 'splash',
+          x: s.tx,
+          y: s.ty,
+          radius: s.splash,
+          net: s.hold > 0,
+        });
       } else if (target) {
         damage(run, target, s.dmg);
       }

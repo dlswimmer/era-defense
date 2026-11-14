@@ -6,6 +6,6 @@ collect ideas on the device, then tap **Copy all** and paste the best ones here.
 Status: `idea` → `planned` → `in game`. When an idea ships, add `by: '<name>'` to its entry in
 `src/sim/data/` so the game shows the credit.
 
-| Idea | Suggested by | Status |
-| ---- | ------------ | ------ |
-|      |              |        |
+| Idea                                                     | Suggested by | Status  |
+| -------------------------------------------------------- | ------------ | ------- |
+| Net Thrower: throws nets that stop monsters for a moment | David        | in game |

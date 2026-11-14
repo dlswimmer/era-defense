@@ -78,17 +78,48 @@ export function bestSpot(run: sim.Run, range: number): Point | null {
   return best;
 }
 
+/** Nets go where the trail is covered by damage towers, so the slowed monsters get hit. */
+export function netSpot(run: sim.Run, range: number): Point | null {
+  const hot = samples(run).filter((p) =>
+    run.towers.some(
+      (t) =>
+        !towerDef(t.type).net &&
+        Math.hypot(p.x - t.x, p.y - t.y) <= sim.towerStats(run, t.type, t.level).range,
+    ),
+  );
+  let best: Point | null = null;
+  let bestScore = 0;
+  for (let y = 0.5; y < run.map.height; y += 0.5) {
+    for (let x = 0.5; x < run.map.width; x += 0.5) {
+      if (!sim.isBuildable(run, x, y)) continue;
+      const score = hot.filter((p) => Math.hypot(p.x - x, p.y - y) <= range).length;
+      if (score > bestScore) {
+        bestScore = score;
+        best = { x, y };
+      }
+    }
+  }
+  return best;
+}
+
 /** Spend gold the way a decent player might: build the best tower it can, then upgrade. */
 export function spend(run: sim.Run) {
   for (let guard = 0; guard < 100; guard++) {
     const options = TOWER_IDS.filter(
-      (id) => sim.isUnlocked(run, id) && run.gold >= towerDef(id).cost,
+      (id) =>
+        sim.isUnlocked(run, id) &&
+        run.gold >= towerDef(id).cost &&
+        // Nets only help next to towers that hit hard, so build a couple once there are some.
+        (!towerDef(id).net ||
+          (run.towers.length >= 3 && run.towers.filter((t) => t.type === id).length < 2)),
     );
     const pick: TowerId | undefined = options.sort(
       (a, b) => towerDef(b).cost - towerDef(a).cost,
     )[0];
     if (pick && run.towers.length < 24) {
-      const spot = bestSpot(run, towerDef(pick).levels[0].range);
+      const spot = towerDef(pick).net
+        ? netSpot(run, towerDef(pick).levels[0].range)
+        : bestSpot(run, towerDef(pick).levels[0].range);
       if (spot && sim.build(run, pick, spot.x, spot.y)) continue;
     }
 

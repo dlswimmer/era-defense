@@ -3,6 +3,7 @@ import { ERAS } from './data/eras';
 import { BOOSTS, STAND, boostEffect } from './data/stand';
 import { unitDef } from './data/units';
 import * as st from './stand';
+import { NO_MODS } from './web';
 
 const fresh = (chest = 100, era = 0) => st.createStand(1, { era, wave: 7, chest });
 const boost = (id: string) => BOOSTS.find((b) => b.id === id)!;
@@ -40,6 +41,49 @@ describe('Last Stand defenders', () => {
     expect(st.hire(poor, 'spear')).toBeNull();
     expect(st.hire(fresh(1000), 'boomerang')).toBeNull();
     expect(st.hire(fresh(1000, 1), 'boomerang')).not.toBeNull();
+  });
+});
+
+describe('Boulder Dropper', () => {
+  it('hits every monster near where the boulder lands', () => {
+    const stand = fresh(1000);
+    expect(st.hire(stand, 'boulder')).not.toBeNull();
+    // Three monsters bunched up just in front of the wall.
+    for (const z of [0.5, 1, 1.5]) {
+      stand.enemies.push({
+        id: stand.nextId++,
+        type: 'caveman',
+        boss: false,
+        tier: 0,
+        rank: 0,
+        hp: 500,
+        maxHp: 500,
+        speed: 0,
+        x: STAND.wall.front + 1.5,
+        z,
+        hitTimer: 0,
+      });
+    }
+    for (let i = 0; i < 100 && !stand.events.some((e) => e.type === 'splash'); i++) {
+      stand.events.length = 0;
+      st.stepStand(stand, 0.05);
+    }
+    const hurt = stand.enemies.filter((e) => e.hp < 500);
+    expect(hurt.length).toBe(3);
+  });
+
+  it('Big Splash makes the boulder hit a wider area', () => {
+    const plain = fresh();
+    const big = st.createStand(1, {
+      era: 0,
+      wave: 7,
+      chest: 100,
+      unitMods: { boulder: { ...NO_MODS, splash: 1.2 } },
+    });
+    expect(st.defenderStats(big, 'boulder').splash).toBeCloseTo(
+      st.defenderStats(plain, 'boulder').splash * 1.2,
+    );
+    expect(st.defenderStats(plain, 'boulder').splash).toBe(unitDef('boulder').splash);
   });
 });
 
@@ -130,7 +174,7 @@ describe('upgrade web in the Last Stand', () => {
       wave: 5,
       chest: 0,
       units: ['spear'],
-      unitMods: { spear: { dmg: 1.5, rate: 1.2, range: 1.1, mastery: true } },
+      unitMods: { spear: { ...NO_MODS, dmg: 1.5, rate: 1.2, range: 1.1, mastery: true } },
       wallBonus: 0.2,
     });
     expect(s.wallMax).toBe(Math.round(plain.wallMax * 1.2));

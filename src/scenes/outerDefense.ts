@@ -1,6 +1,6 @@
 // Phase 1: Outer Defense. Draws the run and turns taps into sim actions (src/sim/run.ts).
 import { TOWER_LOOKS, drawEnemyArt, drawThrown, enemyArtHeight, hasEnemyArt } from '../art/cast';
-import { Puffs, RELEASE as RELEASE_AT, drawPerson, drawShadow } from '../art/sprites';
+import { Puffs, RELEASE as RELEASE_AT, drawNetOver, drawPerson, drawShadow } from '../art/sprites';
 import type { Game, RunSummary, Scene } from '../game';
 import { emoji, fitCanvas, hpBar, drawMap, text } from '../render';
 import { saveMeta } from '../save';
@@ -456,6 +456,23 @@ export function createOuterDefenseScene(game: Game): Scene {
     }
   };
 
+  /** A net over a monster that's caught in one; it fades as the net comes off. */
+  const caughtNet = (
+    ctx: CanvasRenderingContext2D,
+    e: sim.Enemy,
+    x: number,
+    feet: number,
+    w: number,
+    h: number,
+  ) => {
+    const left = e.netUntil - run.time;
+    if (left <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, left / 0.25);
+    drawNetOver(ctx, x, feet, w, h, Math.max(1, tile * 0.025), Math.sin(clock * 22 + e.id));
+    ctx.restore();
+  };
+
   const drawEnemy = (ctx: CanvasRenderingContext2D, e: sim.Enemy) => {
     const def = enemyDef(e.type);
     const ex = e.x * tile;
@@ -473,6 +490,8 @@ export function createOuterDefenseScene(game: Game): Scene {
       if (flash) ctx.scale(1.1, 0.92);
       drawEnemyArt(ctx, e.type, s, { walk: step, attack: null }, e.boss, e.rank);
       ctx.restore();
+      const tall = enemyArtHeight(e.type);
+      caughtNet(ctx, e, ex, feet, s * (tall < 1 ? 1.5 : 0.85), s * tall * 1.02);
       if (e.boss || e.hp < e.maxHp)
         hpBar(ctx, ex, feet - s * enemyArtHeight(e.type) - 8, s * 0.7, 4, e.hp / e.maxHp);
       return;
@@ -491,6 +510,7 @@ export function createOuterDefenseScene(game: Game): Scene {
     emoji(ctx, def.emoji, 0, 0, size * (flash ? 1.08 : 1));
     ctx.restore();
     if (e.boss) emoji(ctx, '👑', ex, ey - size * 0.6, size * 0.4);
+    caughtNet(ctx, e, ex, ey + size * 0.45, size * 1.1, size * 1.05);
     if (e.boss || e.hp < e.maxHp) hpBar(ctx, ex, ey + size * 0.45, size * 0.9, 4, e.hp / e.maxHp);
   };
 
@@ -525,7 +545,8 @@ export function createOuterDefenseScene(game: Game): Scene {
           break;
         }
         case 'splash':
-          rings.push({ x: ev.x, y: ev.y, r: ev.radius, t: 0 });
+          if (!ev.net) rings.push({ x: ev.x, y: ev.y, r: ev.radius, t: 0 }); // nets show on the monsters
+
           break;
         case 'waveStart':
           showBanner(
@@ -690,7 +711,16 @@ export function createOuterDefenseScene(game: Game): Scene {
           const total = Math.hypot(s.tx - from.x, s.ty - from.y) || 1;
           const u = Math.min(1, Math.hypot(s.x - from.x, s.y - from.y) / total);
           const lift = (1 - u) * 0.75 + Math.sin(u * Math.PI) * 0.35;
-          drawThrown(ctx, s.tower, s.x * tile, (s.y - lift) * tile, tile, clock * 12);
+          drawThrown(
+            ctx,
+            s.tower,
+            s.x * tile,
+            (s.y - lift) * tile,
+            tile,
+            clock * 12,
+            u,
+            s.splash * tile,
+          );
         } else if (shot?.emoji) emoji(ctx, shot.emoji, s.x * tile, s.y * tile, tile * shot.size);
         else {
           ctx.fillStyle = shot?.color ?? '#fff';

@@ -8,7 +8,7 @@
 import { ERAS } from './data/eras';
 import { TOWER_IDS, towerDef, type TowerId } from './data/towers';
 import { UNIT_IDS, unitDef, type UnitId } from './data/units';
-import { CAMP, STEPS, WEB, campEffect, type CampId, type StepEffect } from './data/web';
+import { CAMP, WEB, campEffect, stepsFor, type CampId, type StepEffect } from './data/web';
 
 export type NodeKind = 'home' | 'era' | 'tower' | 'unit' | 'step' | 'camp';
 
@@ -120,7 +120,7 @@ function buildWeb(): WebNode[] {
         });
         if (def) {
           let stepParent = nodeId;
-          STEPS.forEach((s, j) => {
+          stepsFor(id!).forEach((s, j) => {
             const stepId = `${nodeId}:${s.id}`;
             nodes.push({
               id: stepId,
@@ -248,9 +248,22 @@ export interface Mods {
   rate: number; // attack speed ×
   range: number; // range ×
   mastery: boolean;
+  hold: number; // nets: + seconds
+  net: number; // nets: size ×
+  grip: boolean; // nets: heavy monsters slow to a crawl
+  splash: number; // splash size ×
 }
 
-export const NO_MODS: Mods = { dmg: 1, rate: 1, range: 1, mastery: false };
+export const NO_MODS: Mods = {
+  dmg: 1,
+  rate: 1,
+  range: 1,
+  mastery: false,
+  hold: 0,
+  net: 1,
+  grip: false,
+  splash: 1,
+};
 
 export interface RunOptions {
   era: number;
@@ -296,7 +309,11 @@ export function runOptions(bought: Iterable<string>): RunOptions {
       m.dmg += fx.dmg ?? 0;
       m.rate += fx.rate ?? 0;
       m.range += fx.range ?? 0;
+      m.hold += fx.hold ?? 0;
+      m.net += fx.net ?? 0;
+      m.splash += fx.splash ?? 0;
       if (fx.mastery) m.mastery = true;
+      if (fx.grip) m.grip = true;
     }
     if (n.camp === 'treasure')
       opts.bonusGold += Math.round(ERAS[n.era]!.startGold * campEffect.treasure);
