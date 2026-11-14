@@ -3,6 +3,7 @@ import { CHANGELOG } from '../changelog';
 import type { Game } from '../game';
 import { saveMeta } from '../save';
 import { el, hideOverlay, showOverlay } from './dom';
+import { checkForUpdate, reloadToUpdate } from './update';
 
 const REPO = 'https://github.com/dlswimmer/era-defense';
 
@@ -65,6 +66,22 @@ export function openOptions(game: Game, onClose: () => void = () => {}) {
     ),
   );
 
+  const updateStatus = el('p', { class: 'update-status' });
+  const updateBtn = el('button', { class: 'btn go' }, '🔄 Check for updates');
+  updateBtn.addEventListener('click', async () => {
+    updateBtn.disabled = true;
+    updateStatus.textContent = 'Checking…';
+    const result = await checkForUpdate();
+    if (result === 'new') {
+      updateStatus.textContent = 'New update found! Loading it now…';
+      reloadToUpdate();
+      return;
+    }
+    updateStatus.textContent =
+      result === 'current' ? 'You have the newest version 👍' : 'Could not check. Are you online?';
+    updateBtn.disabled = false;
+  });
+
   const close = () => {
     hideOverlay();
     onClose();
@@ -76,6 +93,8 @@ export function openOptions(game: Game, onClose: () => void = () => {}) {
       { class: 'card options' },
       el('h2', {}, '⚙️ Options'),
       info,
+      el('div', { class: 'stack' }, updateBtn),
+      updateStatus,
       el('h2', { class: 'notes-title' }, '📜 Patch notes'),
       notes,
       el('div', { class: 'row' }, el('button', { class: 'btn primary', onclick: close }, 'Done')),
