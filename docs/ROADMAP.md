@@ -53,6 +53,18 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   (was 2), so the era stays about 16 runs. Concept art:
   `era-defense-screens/new-units/` in the project files.
 
+- **Ancient and Medieval eras (Nov 14):** both eras have their art now. Ancient: the Archer
+  (draws a bow) on the trail and the Boomerang Crew on the wall, a temple base, cypress trees,
+  wheat and pots. Medieval: a Catapult with a helper in an iron helmet, a Boiling Oil crew with
+  a bubbling pot, a castle base, pine trees and mushrooms. The monsters are the same family in
+  armor: Bronze Grumblers and Bronze Brutes (crested helmets, chest plates, swords), then Iron
+  Grumblers and Iron Brutes (chain mail, maces, iron plates). As they level up every 5 waves
+  they get a new color, a new crest color, a shield, then spikes. Waves only use the run's own
+  era's monsters now; a later era's warm-up waves are as tough as the era before's. Starters
+  follow David's rule: a maxed starter from the era before is slightly (about 10%) better than
+  the next era's fresh starter (`src/sim/power.ts`). Pacing stays about the same (Stone Age 17
+  runs, Ancient 25, Medieval 37). The other 3 towers and defenders per era are still for the kids.
+
 ## Decided in planning (Nov 13) — not built yet
 
 - **Long-running meta loop.** Runs stay short, but permanent progress should last months, with
@@ -62,8 +74,9 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
   shows only the current era's towers (no locked next-era teasers); ones you can't afford yet
   are grayed out. You get
   just 1 tower and 1 unit when you enter an era and unlock the rest one at a time.
-- **Older-era towers/units stay usable** but are weaker; tune so a maxed older tower is roughly
-  as good as a fresh one from the next era.
+- **Older-era towers/units stay usable** but are weaker. David (Nov 14): a maxed tower or
+  defender from the era before is slightly better than the next era's fresh starter
+  (`power.test.ts` checks it for each era that has been tuned).
 - **Harder maps for later.** Once players have strong upgrades, new harder maps (shorter
   trails, more bends to cover) keep Phase 1 short instead of letting it run for 20 minutes.
   A map is one entry in `src/sim/data/maps.ts`.
@@ -84,8 +97,8 @@ The full plan is in [PROJECT_PLAN.md](PROJECT_PLAN.md). This file tracks where w
 
 - **M1 balance pass with the kids.** Knobs: `src/sim/data/game.ts`, `waves.ts`, `towers.ts`,
   `enemies.ts`, `eras.ts`. Check with `npm run balance` after changes.
-- **Graphics pass, Stone Age done** (Rock Thrower, Spear Thrower, Grumbler, Woolly Brute, hut,
-  trees). Get the kids' reactions, then do the next era's people and monsters in `src/art/`.
+- **Graphics pass:** Stone Age, Ancient and Medieval done. Gunpowder, Modern and Future still use
+  emoji (their monsters get robot parts). Get the kids' reactions to the armored monsters.
 - **Last Stand next steps:** pick the other 2 Stone Age defenders and towers, then 4 per era, with the kids (data in
   `src/sim/data/units.ts`), a 2.5D look in the graphics pass, flying enemies.
 - **M3 rest:** heroes, base blueprints. Idea (David, not planned yet): a Time Machine that

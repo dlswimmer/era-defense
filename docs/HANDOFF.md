@@ -57,8 +57,10 @@ Why things are the way they are. Keep this current when a decision changes.
   the levels). The balance test now checks every era is a short run (1-5 minutes).
 - **Waves never stop getting harder**, so every run ends with a leak (and Phase 2). Enemy HP
   ramps within each 5-wave tier, so the end of a tier is the wall your era has to beat.
-- **Waves stay in your era** (David, Nov 13): enemy tiers stop at the run's era, so next-era
-  enemies are a surprise for after you evolve. Past the era's own tiers, HP grows
+- **Waves stay in your era** (David, Nov 13): a run only meets its own era's monsters (Nov 14:
+  older ones no longer mix in either, since later eras are the same monsters in better armor).
+  Next-era enemies are a surprise for after you evolve. Later eras still start 5 waves early as
+  a warm-up; `hpScale` makes those waves only as tough as the era before's monsters. Past the era's own tiers, HP grows
   `WAVES.pastEraGrowth` per wave instead, and every 5 waves the same monsters level up in looks
   (`rankFor`: new color, then a bone helmet, hide armor, back spikes).
 - **War Chest** is separate from gold and only counts up: 1 + tier per kill, plus
@@ -77,6 +79,14 @@ Why things are the way they are. Keep this current when a decision changes.
   caught. Normal monsters stop until then; heavy ones and bosses move at `toughSlow`. Nets skip
   monsters already caught so no throw is wasted. The bot only builds a couple, next to its
   damage towers (`netSpot`), because a net on its own does nothing.
+- **Monster armor** (`Armor` in `src/art/sprites.ts`): one Grumbler and one Brute drawing for
+  every era, with armor 0 (fur, bone gear), 1 (bronze) or 2 (iron); `cast.ts` maps each enemy
+  to a monster and an armor. Robot parts are next for the later eras.
+- **Old gear vs new** (David, Nov 14): a maxed starter from the era before should be slightly
+  better than the next era's fresh one. `src/sim/power.ts` scores a tower or defender as
+  damage × rate × (1 + splash), at tower level 3, and `power.test.ts` keeps the ratio between
+  1.03 and 1.25. The Archer, Catapult, Boomerang Crew and Boiling Oil were retuned for it, and
+  the new monsters' HP was set so pacing stayed where it was.
 - **Upgrade swaps:** every tower and defender gets the same 8-step line, but
   `STEP_SWAPS` in `src/sim/data/web.ts` can replace steps for one of them (same place and
   price), e.g. Sticky Net instead of Power for the Net Thrower.

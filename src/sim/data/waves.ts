@@ -21,11 +21,12 @@ export const WAVES = {
 const MAX_TIER = Math.max(...ENEMY_IDS.map((id) => enemyDef(id).tier));
 
 /**
- * Enemy tier for wave n. It never goes past `maxTier` (the run's era), so a run only ever sees
- * enemies from its own era and earlier: next-era enemies stay a surprise for after you evolve.
+ * The enemy tier a run sees: only its own era's monsters (David: "waves only use the current
+ * era's enemies"). Next-era enemies stay a surprise for after you evolve, and older ones don't
+ * come back: the same monsters just wear better armor in later eras.
  */
-export function tierFor(wave: number, maxTier = MAX_TIER): number {
-  return Math.min(maxTier, MAX_TIER, Math.floor((wave - 1) / WAVES.tierEvery));
+export function tierFor(maxTier = MAX_TIER): number {
+  return Math.min(maxTier, MAX_TIER);
 }
 
 /**
@@ -36,7 +37,18 @@ export function rankFor(wave: number, maxTier = MAX_TIER): number {
   return Math.max(0, Math.floor((wave - 1) / WAVES.tierEvery) - Math.min(maxTier, MAX_TIER));
 }
 
-/** How much tougher enemies are in wave n. Past the era's last tier, they keep getting tougher. */
+/** The HP of a tier's normal (not heavy) monster, to compare how tough tiers are. */
+const tierHp = (t: number) => {
+  const id = ENEMY_IDS.find((e) => enemyDef(e).tier === t && !enemyDef(e).heavy);
+  return id ? enemyDef(id).hp : 1;
+};
+
+/**
+ * How much tougher enemies are in wave n. Past the era's last tier, they keep getting tougher.
+ * Later eras start a few waves early (see `firstWave` in createRun) for a warm-up: those waves
+ * use the era's own monsters but only as tough as the era before's, so runs don't open with a
+ * slog.
+ */
 export function hpScale(wave: number, maxTier = MAX_TIER): number {
   const lastTierEnds = (Math.min(maxTier, MAX_TIER) + 1) * WAVES.tierEvery;
   const past = Math.max(0, wave - lastTierEnds);
@@ -44,6 +56,9 @@ export function hpScale(wave: number, maxTier = MAX_TIER): number {
   let s = (1 + WAVES.hpInTier * inTier) * (1 + WAVES.hpPerWave * (wave - 1));
   s *= Math.pow(WAVES.pastEraGrowth, past);
   if (wave > WAVES.endlessAfter) s *= Math.pow(WAVES.endlessGrowth, wave - WAVES.endlessAfter);
+  const era = Math.min(maxTier, MAX_TIER);
+  const tier = Math.floor((wave - 1) / WAVES.tierEvery);
+  if (tier < era) s *= tierHp(tier) / tierHp(era);
   return s;
 }
 
@@ -61,17 +76,14 @@ const ofTier = (t: number) => ENEMY_IDS.filter((id) => enemyDef(id).tier === t);
 
 /** Builds wave n (1-based). */
 export function buildWave(n: number, rng: Rng, maxTier = MAX_TIER): Wave {
-  const tier = tierFor(n, maxTier);
-  const pool = ofTier(tier);
+  const pool = ofTier(tierFor(maxTier));
   const light = pool.filter((id) => !enemyDef(id).heavy);
   const heavy = pool.filter((id) => enemyDef(id).heavy);
-  const prev = ofTier(tier - 1);
   const count = Math.round(WAVES.baseCount + n * WAVES.countPerWave);
   const spawns: Spawn[] = [];
   for (let i = 0; i < count; i++) {
     let id: EnemyId;
-    if (prev.length && rng.next() < 0.2) id = rng.pick(prev);
-    else if (heavy.length && i % 3 === 2) id = rng.pick(heavy);
+    if (heavy.length && i % 3 === 2) id = rng.pick(heavy);
     else id = rng.pick(light.length ? light : pool);
     spawns.push({ id, boss: false });
   }

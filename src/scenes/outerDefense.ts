@@ -1,6 +1,13 @@
 // Phase 1: Outer Defense. Draws the run and turns taps into sim actions (src/sim/run.ts).
-import { TOWER_LOOKS, drawEnemyArt, drawThrown, enemyArtHeight, hasEnemyArt } from '../art/cast';
-import { Puffs, RELEASE as RELEASE_AT, drawNetOver, drawPerson, drawShadow } from '../art/sprites';
+import {
+  drawEnemyArt,
+  drawThrown,
+  drawTowerArt,
+  enemyArtHeight,
+  hasEnemyArt,
+  hasTowerArt,
+} from '../art/cast';
+import { Puffs, RELEASE as RELEASE_AT, drawNetOver, drawShadow } from '../art/sprites';
 import type { Game, RunSummary, Scene } from '../game';
 import { emoji, fitCanvas, hpBar, drawMap, text } from '../render';
 import { saveMeta } from '../save';
@@ -433,12 +440,11 @@ export function createOuterDefenseScene(game: Game): Scene {
     ctx.ellipse(cx, cy + r * 0.32, r * 0.9, r * 0.44, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    const look = TOWER_LOOKS[t.type];
-    if (look) {
+    if (hasTowerArt(t.type)) {
       ctx.save();
       ctx.translate(cx, cy + r * 0.32);
       ctx.scale(facing.get(t.id) ?? 1, 1);
-      drawPerson(ctx, tile * PERSON_SIZE, look, { throw: throwPose(t), t: clock + t.id });
+      drawTowerArt(ctx, t.type, tile * PERSON_SIZE, throwPose(t), clock + t.id);
       ctx.restore();
     } else {
       const pulse = (firePulse.get(t.id) ?? 0) / 0.16; // 1 right after a shot
@@ -704,20 +710,25 @@ export function createOuterDefenseScene(game: Game): Scene {
       // Shots
       for (const s of run.shots) {
         const shot = towerDef(s.tower).shot;
-        if (TOWER_LOOKS[s.tower]) {
+        if (hasTowerArt(s.tower)) {
           // Leave from the thrower's hand and fly in a little arc.
           let from = shotStart.get(s);
           if (!from) shotStart.set(s, (from = { x: s.x, y: s.y }));
           const total = Math.hypot(s.tx - from.x, s.ty - from.y) || 1;
           const u = Math.min(1, Math.hypot(s.x - from.x, s.y - from.y) / total);
           const lift = (1 - u) * 0.75 + Math.sin(u * Math.PI) * 0.35;
+          // Arrows point along their flight (the slope of the arc); everything else tumbles.
+          const heading = Math.atan2(
+            s.ty - from.y + 0.75 - 0.35 * Math.PI * Math.cos(u * Math.PI),
+            s.tx - from.x,
+          );
           drawThrown(
             ctx,
             s.tower,
             s.x * tile,
             (s.y - lift) * tile,
             tile,
-            clock * 12,
+            s.tower === 'archer' ? heading : clock * 12,
             u,
             s.splash * tile,
           );
@@ -771,11 +782,10 @@ export function createOuterDefenseScene(game: Game): Scene {
         ctx.arc(placing.x * tile, placing.y * tile, GAME.towerRadius * tile, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 0.85;
-        const look = TOWER_LOOKS[placing.type];
-        if (look) {
+        if (hasTowerArt(placing.type)) {
           ctx.save();
           ctx.translate(placing.x * tile, (placing.y + GAME.towerRadius * 0.32) * tile);
-          drawPerson(ctx, tile * PERSON_SIZE, look, { throw: -1, t: clock });
+          drawTowerArt(ctx, placing.type, tile * PERSON_SIZE, -1, clock);
           ctx.restore();
         } else
           emoji(ctx, towerDef(placing.type).emoji, placing.x * tile, placing.y * tile, tile * 0.7);
