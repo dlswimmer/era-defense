@@ -11,6 +11,15 @@ export interface Update {
 
 export const CHANGELOG: Update[] = [
   {
+    id: 15,
+    date: '2026-11-14',
+    title: 'Check for updates',
+    notes: [
+      '🔄 New “Check for updates” button in Options.',
+      '✨ The menu tells you when a new update is ready, so you never miss one.',
+    ],
+  },
+  {
     id: 14,
     date: '2026-11-14',
     title: 'Options and patch notes',

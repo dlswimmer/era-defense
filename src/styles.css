@@ -657,3 +657,8 @@ body {
   font-size: 14px;
   line-height: 1.4;
 }
+.card p.update-status {
+  font-size: 14px;
+  min-height: 1.4em;
+  margin: 6px 0 0;
+}

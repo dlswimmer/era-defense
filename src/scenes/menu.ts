@@ -6,6 +6,7 @@ import { prepareMap } from '../sim/path';
 import { coinsEl } from '../ui/coins';
 import { openIdeaBox } from '../ui/ideas';
 import { buildLabel, hasNewUpdate, openOptions } from '../ui/options';
+import { checkForUpdate, reloadToUpdate } from '../ui/update';
 import { $, el, hideOverlay, showOverlay } from '../ui/dom';
 
 export function createMenuScene(game: Game): Scene {
@@ -13,6 +14,8 @@ export function createMenuScene(game: Game): Scene {
   let tile = 32;
   let eraIndex = 0;
   let eraTimer = 0;
+  let updateReady = false;
+  let active = false;
 
   const show = () => {
     const { best } = game.meta;
@@ -37,6 +40,13 @@ export function createMenuScene(game: Game): Scene {
         el(
           'div',
           { class: 'stack' },
+          updateReady
+            ? el(
+                'button',
+                { class: 'btn evolve nudge', onclick: reloadToUpdate },
+                '🔄 New update! Tap to load it',
+              )
+            : '',
           el('button', { class: 'btn go big', onclick: () => game.go('outer') }, '▶ Play'),
           el(
             'button',
@@ -68,12 +78,22 @@ export function createMenuScene(game: Game): Scene {
 
   return {
     enter() {
+      active = true;
       $('hud').hidden = true;
       $('panel').hidden = true;
       this.onResize!();
       show();
+      // An installed app can stay open for days: offer the newest build when one is live.
+      if (!updateReady) {
+        void checkForUpdate().then((result) => {
+          if (result !== 'new' || updateReady) return;
+          updateReady = true;
+          if (active && !$('overlay').hidden && $('overlay').querySelector('h1')) show();
+        });
+      }
     },
     exit() {
+      active = false;
       hideOverlay();
     },
     onResize() {
